@@ -67,7 +67,7 @@ export default function Home() {
     let live = true;
     const tick = async () => {
       try {
-        const res = await fetch("/api/aircraft");
+        const res = await fetch(`/api/aircraft?nm=${settings.radarNm}`);
         const payload = (await res.json()) as RadarPayload;
         if (live) setData(payload);
       } catch {
@@ -80,7 +80,7 @@ export default function Home() {
       live = false;
       clearInterval(id);
     };
-  }, [settings.pollSec]);
+  }, [settings.pollSec, settings.radarNm]);
 
   const feature = useCallback(async (a: Aircraft) => {
     setSelected(a);
@@ -214,7 +214,7 @@ export default function Home() {
         <Radar
           aircraft={data?.aircraft ?? []}
           airfields={data?.airfields ?? []}
-          radiusKm={data?.radiusKm ?? 93}
+          radiusKm={data?.radiusKm ?? settings.radarNm * 1.852}
           selectedHex={selected?.hex ?? null}
         />
 
@@ -228,7 +228,8 @@ export default function Home() {
             <span className="h-px w-16 bg-line" />
           </div>
           <div className="font-mono text-[10px] uppercase tracking-[0.4em] text-faint">
-            {data?.home ?? ""} · {Math.round(data?.radiusKm ?? 93)} km
+            {data?.home ?? ""} ·{" "}
+            {Math.round(data?.radiusKm ?? settings.radarNm * 1.852)} km
           </div>
         </div>
 

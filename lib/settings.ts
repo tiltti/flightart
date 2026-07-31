@@ -9,6 +9,7 @@ export interface Settings {
   spotlightSec: number; // how long one aircraft stays featured
   cooldownMin: number; // same airframe not re-featured within
   pollSec: number; // radar data poll interval
+  radarNm: number; // radar range in nautical miles
   rotatePages: boolean; // rotate display <-> log
   rotateIntervalMin: number; // show the log every N minutes
   rotateLogSec: number; // how long the log stays up
@@ -20,6 +21,7 @@ export const DEFAULT_SETTINGS: Settings = {
   spotlightSec: 75,
   cooldownMin: 20,
   pollSec: 6,
+  radarNm: 50,
   rotatePages: false,
   rotateIntervalMin: 10,
   rotateLogSec: 30,

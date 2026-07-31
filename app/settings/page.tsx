@@ -177,6 +177,16 @@ export default function SettingsPage() {
           <h2 className="mb-2 font-mono text-[10px] uppercase tracking-[0.35em] text-faint">
             Data
           </h2>
+          <Row label="Radar range" hint="1 NM = 1.852 km">
+            <Slider
+              value={settings.radarNm}
+              min={10}
+              max={100}
+              step={5}
+              unit="NM"
+              onChange={(radarNm) => update({ radarNm })}
+            />
+          </Row>
           <Row label="Radar poll" hint="adsb.fi asks for max ~1 req/s">
             <Slider
               value={settings.pollSec}

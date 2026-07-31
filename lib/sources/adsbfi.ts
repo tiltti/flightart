@@ -21,8 +21,8 @@ interface AdsbFiAircraft {
   seen_pos?: number;
 }
 
-export async function fetchNearby(): Promise<Aircraft[]> {
-  const url = `https://opendata.adsb.fi/api/v2/lat/${HOME.lat}/lon/${HOME.lon}/dist/${RADIUS_NM}`;
+export async function fetchNearby(nm: number = RADIUS_NM): Promise<Aircraft[]> {
+  const url = `https://opendata.adsb.fi/api/v2/lat/${HOME.lat}/lon/${HOME.lon}/dist/${nm}`;
   const res = await fetch(url, {
     cache: "no-store",
     headers: { "User-Agent": USER_AGENT },

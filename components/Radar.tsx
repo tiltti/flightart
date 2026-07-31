@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { airlineFromCallsign } from "@/lib/airlines";
 import type { Aircraft, AirfieldMarker } from "@/lib/types";
 
 const VIEW = 115; // svg half-extent; the outer ring sits at 100
@@ -195,6 +196,10 @@ export default function Radar({
         {aircraft.map((a) => {
           const p = toXY(a.bearingDeg, a.distanceKm, radiusKm);
           const sel = a.hex === selectedHex;
+          const ident = (a.registration ?? a.callsign ?? a.hex).toUpperCase();
+          const detail = [a.typeCode, airlineFromCallsign(a.callsign)]
+            .filter(Boolean)
+            .join(" · ");
           return (
             <g
               key={a.hex}
@@ -216,15 +221,25 @@ export default function Radar({
                   fillOpacity={sel ? 1 : 0.85}
                 />
               </g>
-              {sel && (
+              <text
+                x="4.6"
+                y={detail ? "-0.4" : "1.2"}
+                fontSize={sel ? 3.4 : 3}
+                className={`font-mono ${sel ? "fill-accent" : "fill-dim"}`}
+                style={{ letterSpacing: "0.12em" }}
+              >
+                {ident}
+              </text>
+              {detail && (
                 <text
-                  x="5.5"
-                  y="1.2"
-                  fontSize="3.6"
-                  className="fill-accent font-mono"
-                  style={{ letterSpacing: "0.15em" }}
+                  x="4.6"
+                  y="3.2"
+                  fontSize="2.4"
+                  className={`font-mono ${sel ? "fill-accent" : "fill-faint"}`}
+                  fillOpacity={sel ? 0.8 : 1}
+                  style={{ letterSpacing: "0.1em" }}
                 >
-                  {(a.registration ?? a.callsign ?? a.hex).toUpperCase()}
+                  {detail}
                 </text>
               )}
             </g>

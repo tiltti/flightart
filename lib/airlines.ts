@@ -1,0 +1,55 @@
+// Short operator names from ICAO callsign prefixes — enough for ambient
+// radar labels without hitting any API. Unknown prefixes return null.
+const AIRLINES: Record<string, string> = {
+  FIN: "FINNAIR",
+  SAS: "SAS",
+  DLH: "LUFTHANSA",
+  LHX: "LH CITY",
+  CLH: "LH CITYLINE",
+  GEC: "LH CARGO",
+  BAW: "BRITISH",
+  AFR: "AIR FRANCE",
+  KLM: "KLM",
+  RYR: "RYANAIR",
+  WZZ: "WIZZ",
+  WMT: "WIZZ MALTA",
+  EZY: "EASYJET",
+  EJU: "EASYJET",
+  NOZ: "NORWEGIAN",
+  NSZ: "NORWEGIAN",
+  IBK: "NORWEGIAN",
+  ICE: "ICELANDAIR",
+  EIN: "AER LINGUS",
+  SWR: "SWISS",
+  AUA: "AUSTRIAN",
+  EWG: "EUROWINGS",
+  TAP: "TAP",
+  THY: "TURKISH",
+  LOT: "LOT",
+  QTR: "QATAR",
+  UAE: "EMIRATES",
+  ETD: "ETIHAD",
+  AFL: "AEROFLOT",
+  SDM: "ROSSIYA",
+  SBI: "S7",
+  VLG: "VUELING",
+  IBE: "IBERIA",
+  PGT: "PEGASUS",
+  EXS: "JET2",
+  TVF: "TRANSAVIA",
+  TRA: "TRANSAVIA",
+  BCS: "DHL",
+  DHK: "DHL",
+  BOX: "AEROLOGIC",
+  FDX: "FEDEX",
+  UPS: "UPS",
+  CLX: "CARGOLUX",
+  FNF: "AIR FORCE",
+  FIH: "FINNHEMS",
+};
+
+export function airlineFromCallsign(callsign: string | null): string | null {
+  if (!callsign) return null;
+  const prefix = callsign.slice(0, 3).toUpperCase();
+  return /^[A-Z]{3}$/.test(prefix) ? (AIRLINES[prefix] ?? null) : null;
+}
