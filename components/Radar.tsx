@@ -18,6 +18,8 @@ interface Props {
   airfields: AirfieldMarker[];
   radiusKm: number;
   selectedHex: string | null;
+  queuedHexes?: string[];
+  onSelect?: (hex: string) => void;
 }
 
 export default function Radar({
@@ -25,6 +27,8 @@ export default function Radar({
   airfields,
   radiusKm,
   selectedHex,
+  queuedHexes,
+  onSelect,
 }: Props) {
   const trails = useRef(new Map<string, { x: number; y: number }[]>());
 
@@ -205,7 +209,20 @@ export default function Radar({
               key={a.hex}
               transform={`translate(${p.x} ${p.y})`}
               opacity={a.seenSec > 20 ? 0.4 : 1}
+              className={onSelect ? "cursor-pointer" : undefined}
+              onClick={onSelect ? () => onSelect(a.hex) : undefined}
             >
+              {/* invisible hit target — small enough not to mask neighbours */}
+              <circle r="4.5" fill="transparent" pointerEvents="all" />
+              {queuedHexes?.includes(a.hex) && !sel && (
+                <circle
+                  r="4"
+                  className="fill-none stroke-accent"
+                  strokeWidth="0.4"
+                  strokeDasharray="1.5 1.5"
+                  opacity="0.7"
+                />
+              )}
               {sel && (
                 <circle
                   r="4"

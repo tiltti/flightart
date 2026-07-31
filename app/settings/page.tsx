@@ -65,10 +65,12 @@ function Slider({
 function Segmented<T extends string>({
   value,
   options,
+  labels,
   onChange,
 }: {
   value: T;
   options: readonly T[];
+  labels?: Partial<Record<T, string>>;
   onChange: (v: T) => void;
 }) {
   return (
@@ -83,7 +85,7 @@ function Segmented<T extends string>({
               : "text-faint hover:text-dim"
           }`}
         >
-          {o}
+          {labels?.[o] ?? o}
         </button>
       ))}
     </div>
@@ -109,11 +111,12 @@ export default function SettingsPage() {
           </h2>
           <Row
             label="Spotlight view"
-            hint="auto = poster when a cutout image is ready, otherwise photo"
+            hint="auto/poster = poster art when a clean cutout exists · photo = always the photograph"
           >
             <Segmented
               value={settings.displayMode}
               options={["auto", "poster", "dark"] as const}
+              labels={{ dark: "photo" }}
               onChange={(displayMode: Settings["displayMode"]) =>
                 update({ displayMode })
               }

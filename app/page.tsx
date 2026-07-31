@@ -57,11 +57,13 @@ export default function Home() {
   const [selected, setSelected] = useState<Aircraft | null>(null);
   const [enrichment, setEnrichment] = useState<Enrichment | null>(null);
   const [idleStats, setIdleStats] = useState<Stats | null>(null);
+  const [queue, setQueue] = useState<string[]>([]);
 
   const featuredAt = useRef(new Map<string, number>());
   const selectedHexRef = useRef<string | null>(null);
   const selectedSince = useRef(0);
   const selectedLastSeen = useRef(0);
+  const manualActive = useRef(false);
 
   useEffect(() => {
     let live = true;
@@ -146,14 +148,30 @@ export default function Home() {
           (featuredAt.current.get(b.hex) ?? 0),
       )[0] ?? null;
 
+    const validQueue = queue.filter(
+      (h) => h !== selected?.hex && list.some((a) => a.hex === h),
+    );
+    if (validQueue.length !== queue.length) setQueue(validQueue);
+
     const currentGone =
       !!selected && !current && now - selectedLastSeen.current > GONE_GRACE_MS;
     const currentStale =
       !!selected &&
       now - selectedSince.current > settings.spotlightSec * 1000 &&
-      !!pick;
+      (validQueue.length > 0 || !!pick);
 
     if (!selected || currentGone || currentStale) {
+      // clicked queue runs first, each for the normal spotlight duration
+      const queuedNext = validQueue[0]
+        ? list.find((a) => a.hex === validQueue[0])
+        : undefined;
+      if (queuedNext) {
+        setQueue((q) => q.filter((h) => h !== queuedNext.hex));
+        manualActive.current = true;
+        feature(queuedNext);
+        return;
+      }
+      manualActive.current = false; // queue drained — back to auto rotation
       const next = pick ?? (!selected || currentGone ? fallback : null);
       if (next) {
         feature(next);
@@ -163,7 +181,7 @@ export default function Home() {
         selectedHexRef.current = null;
       }
     }
-  }, [data, selected, feature, settings.cooldownMin, settings.spotlightSec]);
+  }, [data, selected, queue, feature, settings.cooldownMin, settings.spotlightSec]);
 
   useEffect(() => {
     if (selected) return;
@@ -216,6 +234,18 @@ export default function Home() {
           airfields={data?.airfields ?? []}
           radiusKm={data?.radiusKm ?? settings.radarNm * 1.852}
           selectedHex={selected?.hex ?? null}
+          queuedHexes={queue}
+          onSelect={(hex) => {
+            const a = data?.aircraft.find((x) => x.hex === hex);
+            if (!a || a.hex === selected?.hex || queue.includes(hex)) return;
+            if (!selected || !manualActive.current) {
+              // first click interrupts auto rotation right away
+              manualActive.current = true;
+              feature(a);
+            } else {
+              setQueue((q) => (q.includes(hex) ? q : [...q, hex]));
+            }
+          }}
         />
 
         {/* all chrome lives on the radar side — the spotlight keeps its half clean */}
