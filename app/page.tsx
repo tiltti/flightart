@@ -217,15 +217,22 @@ export default function Home() {
           radiusKm={data?.radiusKm ?? 93}
           selectedHex={selected?.hex ?? null}
         />
-      </aside>
 
-      <DecoFrame />
-
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between p-7 font-mono text-[11px] uppercase tracking-[0.4em] text-dim">
-        <div className="text-faint">
-          {data?.home ?? ""} · {Math.round(data?.radiusKm ?? 93)} km
+        {/* all chrome lives on the radar side — the spotlight keeps its half clean */}
+        <div className="pointer-events-none absolute inset-x-0 top-7 z-20 flex flex-col items-center gap-3">
+          <div className="flex items-center gap-5">
+            <span className="h-px w-16 bg-line" />
+            <span className="font-deco text-[13px] tracking-[0.6em] text-dim">
+              ✦ FLIGHTART ✦
+            </span>
+            <span className="h-px w-16 bg-line" />
+          </div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.4em] text-faint">
+            {data?.home ?? ""} · {Math.round(data?.radiusKm ?? 93)} km
+          </div>
         </div>
-        <div className="pointer-events-auto flex items-center gap-6">
+
+        <div className="absolute right-7 top-7 z-20 flex items-center gap-6 font-mono text-[11px] uppercase tracking-[0.4em] text-dim">
           <Clock />
           <Link
             href="/history"
@@ -240,19 +247,13 @@ export default function Home() {
             set
           </Link>
         </div>
-      </header>
 
-      <div className="pointer-events-none absolute inset-x-0 top-6 z-20 flex items-center justify-center gap-5">
-        <span className="h-px w-16 bg-line" />
-        <span className="font-deco text-[13px] tracking-[0.6em] text-dim">
-          ✦ FLIGHTART ✦
-        </span>
-        <span className="h-px w-16 bg-line" />
-      </div>
+        <div className="absolute bottom-6 right-7 z-20 font-mono text-[10px] uppercase tracking-[0.35em] text-faint">
+          {data ? `${data.aircraft.length} aircraft in range` : "connecting"}
+        </div>
+      </aside>
 
-      <div className="absolute bottom-6 right-7 z-20 font-mono text-[10px] uppercase tracking-[0.35em] text-faint">
-        {data ? `${data.aircraft.length} aircraft in range` : "connecting"}
-      </div>
+      <DecoFrame />
     </main>
   );
 }

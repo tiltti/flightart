@@ -163,7 +163,13 @@ export default function Spotlight({ aircraft, enrichment, settings }: Props) {
         >
           <div className="pointer-events-none absolute inset-4 border border-line" />
           <div className="absolute left-9 top-8 z-10 font-deco text-[13px] tracking-[0.55em] text-ink">
-            FLIGHTART
+            {new Date()
+              .toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })
+              .toUpperCase()}
           </div>
           <div className="relative z-10 flex h-full flex-col px-12 pb-14 pt-16">
             <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
