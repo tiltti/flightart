@@ -1,65 +1,258 @@
-import Image from "next/image";
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import DecoFrame from "@/components/DecoFrame";
+import Radar from "@/components/Radar";
+import Spotlight from "@/components/Spotlight";
+import { useSettings } from "@/lib/settings";
+import type {
+  Aircraft,
+  Enrichment,
+  RadarPayload,
+  Stats,
+  Summary,
+} from "@/lib/types";
+
+const GONE_GRACE_MS = 15_000; // keep spotlight through a brief signal dropout
+
+function Clock() {
+  const [now, setNow] = useState("");
+  useEffect(() => {
+    const update = () =>
+      setNow(
+        new Date().toLocaleTimeString("fi-FI", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      );
+    update();
+    const id = setInterval(update, 10_000);
+    return () => clearInterval(id);
+  }, []);
+  return <span>{now}</span>;
+}
+
+function Idle({ stats, error }: { stats: Stats | null; error?: string }) {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-8 animate-[fa-fade_1.5s_ease_both]">
+      <div className="font-display text-5xl font-light uppercase tracking-[0.35em] text-ink/25">
+        {error ? "No signal" : "Clear skies"}
+      </div>
+      {stats && stats.totalSightings > 0 && (
+        <div className="font-mono text-xs uppercase tracking-[0.3em] text-faint">
+          {stats.totalSightings} flights logged · {stats.uniqueAircraft} aircraft
+          {stats.topTypes[0] && ` · most seen ${stats.topTypes[0].code}`}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Home() {
+  const router = useRouter();
+  const [settings] = useSettings();
+  const [data, setData] = useState<RadarPayload | null>(null);
+  const [selected, setSelected] = useState<Aircraft | null>(null);
+  const [enrichment, setEnrichment] = useState<Enrichment | null>(null);
+  const [idleStats, setIdleStats] = useState<Stats | null>(null);
+
+  const featuredAt = useRef(new Map<string, number>());
+  const selectedHexRef = useRef<string | null>(null);
+  const selectedSince = useRef(0);
+  const selectedLastSeen = useRef(0);
+
+  useEffect(() => {
+    let live = true;
+    const tick = async () => {
+      try {
+        const res = await fetch("/api/aircraft");
+        const payload = (await res.json()) as RadarPayload;
+        if (live) setData(payload);
+      } catch {
+        // keep the last frame on transient failures
+      }
+    };
+    tick();
+    const id = setInterval(tick, settings.pollSec * 1000);
+    return () => {
+      live = false;
+      clearInterval(id);
+    };
+  }, [settings.pollSec]);
+
+  const feature = useCallback(async (a: Aircraft) => {
+    setSelected(a);
+    setEnrichment(null);
+    selectedHexRef.current = a.hex;
+    selectedSince.current = Date.now();
+    selectedLastSeen.current = Date.now();
+    featuredAt.current.set(a.hex, Date.now());
+    try {
+      const q = new URLSearchParams({ hex: a.hex });
+      if (a.callsign) q.set("callsign", a.callsign);
+      if (a.registration) q.set("reg", a.registration);
+      const res = await fetch(`/api/enrich?${q}`);
+      const e = (await res.json()) as Enrichment;
+      if (selectedHexRef.current !== a.hex) return;
+      setEnrichment(e);
+      fetch("/api/sightings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(e),
+      }).catch(() => {});
+
+      // cutout generation runs in the background — re-check a few times
+      if (e.photo && !e.cutoutUrl) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          await new Promise((r) => setTimeout(r, 12_000));
+          if (selectedHexRef.current !== a.hex) return;
+          const again = (await fetch(`/api/enrich?${q}`)
+            .then((r) => r.json())
+            .catch(() => null)) as Enrichment | null;
+          if (again?.cutoutUrl) {
+            if (selectedHexRef.current === a.hex) setEnrichment(again);
+            return;
+          }
+        }
+      }
+    } catch {
+      // text-only spotlight when enrichment is unavailable
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!data) return;
+    const now = Date.now();
+    const list = data.aircraft;
+    const current = selected
+      ? list.find((a) => a.hex === selected.hex)
+      : undefined;
+    if (current) {
+      selectedLastSeen.current = now;
+      if (current !== selected) setSelected(current); // refresh live numbers
+    }
+
+    const cooldownOver = (a: Aircraft) =>
+      now - (featuredAt.current.get(a.hex) ?? 0) >
+      settings.cooldownMin * 60_000;
+    const candidates = list.filter((a) => a.hex !== selected?.hex);
+    const pick = candidates.find(cooldownOver) ?? null; // list is distance-sorted
+    const fallback =
+      [...candidates].sort(
+        (a, b) =>
+          (featuredAt.current.get(a.hex) ?? 0) -
+          (featuredAt.current.get(b.hex) ?? 0),
+      )[0] ?? null;
+
+    const currentGone =
+      !!selected && !current && now - selectedLastSeen.current > GONE_GRACE_MS;
+    const currentStale =
+      !!selected &&
+      now - selectedSince.current > settings.spotlightSec * 1000 &&
+      !!pick;
+
+    if (!selected || currentGone || currentStale) {
+      const next = pick ?? (!selected || currentGone ? fallback : null);
+      if (next) {
+        feature(next);
+      } else if (currentGone || list.length === 0) {
+        setSelected(null);
+        setEnrichment(null);
+        selectedHexRef.current = null;
+      }
+    }
+  }, [data, selected, feature, settings.cooldownMin, settings.spotlightSec]);
+
+  useEffect(() => {
+    if (selected) return;
+    let live = true;
+    const load = async () => {
+      try {
+        const summary = (await fetch("/api/sightings").then((r) =>
+          r.json(),
+        )) as Summary;
+        if (live) setIdleStats(summary.stats);
+      } catch {
+        // idle stats are decorative
+      }
+    };
+    load();
+    const id = setInterval(load, 120_000);
+    return () => {
+      live = false;
+      clearInterval(id);
+    };
+  }, [selected]);
+
+  // page rotation: flip to the logbook every N minutes
+  useEffect(() => {
+    if (!settings.rotatePages) return;
+    const id = setInterval(
+      () => router.push("/history"),
+      settings.rotateIntervalMin * 60_000,
+    );
+    return () => clearInterval(id);
+  }, [settings.rotatePages, settings.rotateIntervalMin, router]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className="relative flex h-dvh w-full overflow-hidden bg-bg text-ink">
+      <section className="relative min-w-0 flex-[1.25]">
+        {selected ? (
+          <Spotlight
+            aircraft={selected}
+            enrichment={enrichment}
+            settings={settings}
+          />
+        ) : (
+          <Idle stats={idleStats} error={data?.error} />
+        )}
+      </section>
+
+      <aside className="relative flex flex-1 items-center justify-center p-10">
+        <Radar
+          aircraft={data?.aircraft ?? []}
+          airfields={data?.airfields ?? []}
+          radiusKm={data?.radiusKm ?? 93}
+          selectedHex={selected?.hex ?? null}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+      </aside>
+
+      <DecoFrame />
+
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between p-7 font-mono text-[11px] uppercase tracking-[0.4em] text-dim">
+        <div className="text-faint">
+          {data?.home ?? ""} · {Math.round(data?.radiusKm ?? 93)} km
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        <div className="pointer-events-auto flex items-center gap-6">
+          <Clock />
+          <Link
+            href="/history"
+            className="text-faint transition-colors hover:text-accent"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            log
+          </Link>
+          <Link
+            href="/settings"
+            className="text-faint transition-colors hover:text-accent"
           >
-            Documentation
-          </a>
+            set
+          </Link>
         </div>
-      </main>
-    </div>
+      </header>
+
+      <div className="pointer-events-none absolute inset-x-0 top-6 z-20 flex items-center justify-center gap-5">
+        <span className="h-px w-16 bg-line" />
+        <span className="font-deco text-[13px] tracking-[0.6em] text-dim">
+          ✦ FLIGHTART ✦
+        </span>
+        <span className="h-px w-16 bg-line" />
+      </div>
+
+      <div className="absolute bottom-6 right-7 z-20 font-mono text-[10px] uppercase tracking-[0.35em] text-faint">
+        {data ? `${data.aircraft.length} aircraft in range` : "connecting"}
+      </div>
+    </main>
   );
 }

@@ -1,0 +1,187 @@
+import { USER_AGENT } from "@/lib/config";
+import { ensureCutout, hasCutout } from "@/lib/cutout";
+import type { Enrichment, PhotoInfo, RouteInfo } from "@/lib/types";
+
+// adsbdb.com: aircraft metadata + callsign routes. planespotters.net: photos
+// of the exact airframe, free with photographer credit + link back.
+const TTL_HIT = 24 * 60 * 60 * 1000;
+const TTL_MISS = 30 * 60 * 1000;
+const MAX_ENTRIES = 800;
+
+interface AircraftInfo {
+  typeName: string | null;
+  registration: string | null;
+  operator: string | null;
+}
+
+interface CacheEntry<T> {
+  at: number;
+  ttl: number;
+  value: T;
+}
+type Cache<T> = Map<string, CacheEntry<T>>;
+
+const g = globalThis as unknown as {
+  __faAircraft?: Cache<AircraftInfo>;
+  __faRoute?: Cache<RouteInfo | null>;
+  __faPhoto?: Cache<PhotoInfo | null>;
+};
+const aircraftCache: Cache<AircraftInfo> = (g.__faAircraft ??= new Map());
+const routeCache: Cache<RouteInfo | null> = (g.__faRoute ??= new Map());
+const photoCache: Cache<PhotoInfo | null> = (g.__faPhoto ??= new Map());
+
+function getFresh<T>(cache: Cache<T>, key: string): T | undefined {
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < hit.ttl) return hit.value;
+  return undefined;
+}
+
+function put<T>(cache: Cache<T>, key: string, value: T, ttl: number) {
+  if (cache.size >= MAX_ENTRIES) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  cache.set(key, { at: Date.now(), ttl, value });
+}
+
+async function getJson(url: string): Promise<unknown | null> {
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+interface AdsbdbAirport {
+  iata_code?: string;
+  municipality?: string;
+  name?: string;
+}
+
+async function aircraftInfo(hex: string): Promise<AircraftInfo> {
+  const cached = getFresh(aircraftCache, hex);
+  if (cached) return cached;
+  const body = (await getJson(`https://api.adsbdb.com/v0/aircraft/${hex}`)) as {
+    response?:
+      | {
+          aircraft?: {
+            type?: string;
+            manufacturer?: string;
+            registration?: string;
+            registered_owner?: string;
+          };
+        }
+      | string;
+  } | null;
+  const ac =
+    typeof body?.response === "object" ? body.response?.aircraft : undefined;
+  const value: AircraftInfo = {
+    typeName: ac ? [ac.manufacturer, ac.type].filter(Boolean).join(" ") || null : null,
+    registration: ac?.registration ?? null,
+    operator: ac?.registered_owner ?? null,
+  };
+  put(aircraftCache, hex, value, ac ? TTL_HIT : TTL_MISS);
+  return value;
+}
+
+async function routeInfo(callsign: string): Promise<RouteInfo | null> {
+  const cached = getFresh(routeCache, callsign);
+  if (cached !== undefined) return cached;
+  const body = (await getJson(
+    `https://api.adsbdb.com/v0/callsign/${encodeURIComponent(callsign)}`,
+  )) as {
+    response?:
+      | {
+          flightroute?: {
+            airline?: { name?: string };
+            origin?: AdsbdbAirport;
+            destination?: AdsbdbAirport;
+          };
+        }
+      | string;
+  } | null;
+  const fr =
+    typeof body?.response === "object" ? body.response?.flightroute : undefined;
+  const value: RouteInfo | null = fr
+    ? {
+        originIata: fr.origin?.iata_code ?? null,
+        originCity: fr.origin?.municipality ?? null,
+        destIata: fr.destination?.iata_code ?? null,
+        destCity: fr.destination?.municipality ?? null,
+        airline: fr.airline?.name ?? null,
+      }
+    : null;
+  put(routeCache, callsign, value, value ? TTL_HIT : TTL_MISS);
+  return value;
+}
+
+interface PlanespottersPhoto {
+  thumbnail_large?: { src?: string };
+  link?: string;
+  photographer?: string;
+}
+
+async function fetchPhoto(url: string): Promise<PhotoInfo | null> {
+  const body = (await getJson(url)) as { photos?: PlanespottersPhoto[] } | null;
+  const p = body?.photos?.[0];
+  if (!p?.thumbnail_large?.src) return null;
+  return {
+    url: p.thumbnail_large.src,
+    pageLink: p.link ?? "https://www.planespotters.net",
+    photographer: p.photographer ?? "planespotters.net",
+  };
+}
+
+async function photoInfo(
+  hex: string,
+  registration: string | null,
+): Promise<PhotoInfo | null> {
+  const cached = getFresh(photoCache, hex);
+  if (cached !== undefined) return cached;
+  let photo = await fetchPhoto(
+    `https://api.planespotters.net/pub/photos/hex/${hex}`,
+  );
+  if (!photo && registration) {
+    photo = await fetchPhoto(
+      `https://api.planespotters.net/pub/photos/reg/${encodeURIComponent(registration)}`,
+    );
+  }
+  put(photoCache, hex, photo, photo ? TTL_HIT : TTL_MISS);
+  return photo;
+}
+
+export async function getEnrichment(params: {
+  hex: string;
+  callsign?: string | null;
+  registration?: string | null;
+}): Promise<Enrichment> {
+  const hex = params.hex.toLowerCase();
+  const [info, route, photo] = await Promise.all([
+    aircraftInfo(hex),
+    params.callsign ? routeInfo(params.callsign) : Promise.resolve(null),
+    photoInfo(hex, params.registration ?? null),
+  ]);
+  let cutoutUrl: string | null = null;
+  if (photo) {
+    if (await hasCutout(hex)) {
+      cutoutUrl = `/api/cutout/${hex}`;
+    } else {
+      void ensureCutout(hex, photo.url); // ready for a later re-fetch
+    }
+  }
+  return {
+    hex,
+    registration: params.registration ?? info.registration,
+    typeName: info.typeName,
+    operator: route?.airline ?? info.operator,
+    route,
+    photo,
+    cutoutUrl,
+  };
+}

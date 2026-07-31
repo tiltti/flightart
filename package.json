@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3005",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3005",
     "lint": "eslint"
   },
   "dependencies": {
+    "@imgly/background-removal-node": "^1.4.5",
     "next": "16.2.12",
     "react": "19.2.4",
     "react-dom": "19.2.4"
@@ -22,5 +23,10 @@
     "eslint-config-next": "16.2.12",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "allowScripts": {
+    "onnxruntime-node@1.17.3": true,
+    "sharp@0.32.6": true,
+    "sharp@0.34.5": true
   }
 }
