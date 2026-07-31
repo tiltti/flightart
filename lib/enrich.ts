@@ -1,5 +1,6 @@
 import { USER_AGENT } from "@/lib/config";
 import { ensureCutout, hasCutout } from "@/lib/cutout";
+import { ensurePhotoFile } from "@/lib/photos";
 import type { Enrichment, PhotoInfo, RouteInfo } from "@/lib/types";
 
 // adsbdb.com: aircraft metadata + callsign routes. planespotters.net: photos
@@ -167,8 +168,12 @@ export async function getEnrichment(params: {
     params.callsign ? routeInfo(params.callsign) : Promise.resolve(null),
     photoInfo(hex, params.registration ?? null),
   ]);
+  let servedPhoto = photo;
   let cutoutUrl: string | null = null;
   if (photo) {
+    // one CDN fetch per airframe, ever — everything serves from disk after
+    const localOk = await ensurePhotoFile(hex, photo.url);
+    if (localOk) servedPhoto = { ...photo, url: `/api/photo/${hex}` };
     if (await hasCutout(hex)) {
       cutoutUrl = `/api/cutout/${hex}`;
     } else {
@@ -181,7 +186,7 @@ export async function getEnrichment(params: {
     typeName: info.typeName,
     operator: route?.airline ?? info.operator,
     route,
-    photo,
+    photo: servedPhoto,
     cutoutUrl,
   };
 }

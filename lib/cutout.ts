@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { USER_AGENT } from "@/lib/config";
+import { photoFile } from "@/lib/photos";
 
 // Poster mode: aircraft photo -> background removed -> PNG with alpha,
 // cached on disk. First run downloads the ONNX model, so generation is
@@ -37,12 +38,19 @@ export function ensureCutout(hex: string, photoUrl: string): Promise<boolean> {
 async function generate(hex: string, photoUrl: string): Promise<boolean> {
   try {
     if (await hasCutout(hex)) return true;
-    const res = await fetch(photoUrl, {
-      headers: { "User-Agent": USER_AGENT },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) throw new Error(`photo fetch ${res.status}`);
-    const source = new Blob([await res.arrayBuffer()], { type: "image/jpeg" });
+    // prefer the locally cached photo; fall back to one remote fetch
+    let bytes: Buffer;
+    try {
+      bytes = await fs.readFile(photoFile(hex));
+    } catch {
+      const res = await fetch(photoUrl, {
+        headers: { "User-Agent": USER_AGENT },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) throw new Error(`photo fetch ${res.status}`);
+      bytes = Buffer.from(await res.arrayBuffer());
+    }
+    const source = new Blob([new Uint8Array(bytes)], { type: "image/jpeg" });
     const { removeBackground } = await import("@imgly/background-removal-node");
     const cut = await removeBackground(source, {
       output: { format: "image/png" },

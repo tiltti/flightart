@@ -30,6 +30,11 @@ RADIUS_NM=40
 | [adsbdb.com](https://www.adsbdb.com) | konetyyppi, omistaja, callsign → reitti | |
 | [Planespotters.net](https://www.planespotters.net) photo API | kuva kyseisestä yksilöstä | vaatii kuvaajan krediitin + linkin — näkyy spotlightin kulmassa |
 
+Kuvat cachetetaan levylle: alkuperäiskuva `data/photos/<hex>.jpg` ja
+taustanpoistettu poster-cutout `data/cutouts/<hex>.png` — yksi CDN-haku per
+koneyksilö, sen jälkeen kaikki tarjoillaan lokaalisti (`/api/photo`,
+`/api/cutout`).
+
 Bongaukset tallentuvat tiedostoon `data/sightings.json` (gitignoressa).
 Sama kone 60 min sisällä = sama bongaus.
 
