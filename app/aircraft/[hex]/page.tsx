@@ -94,9 +94,9 @@ export default function AircraftPage() {
     setBusy("searching galleries…");
     try {
       const p = detail?.registration
-        ? `?reg=${encodeURIComponent(detail.registration)}`
+        ? `&reg=${encodeURIComponent(detail.registration)}`
         : "";
-      const r = await fetch(`/api/plane/${hex}/candidates${p}`).then((res) =>
+      const r = await fetch(`/api/plane/${hex}?candidates=1${p}`).then((res) =>
         res.json(),
       );
       setCands(r.candidates ?? []);
@@ -111,7 +111,7 @@ export default function AircraftPage() {
   ) => {
     setBusy("setting photo + trying background removal…");
     try {
-      await fetch(`/api/plane/${hex}/photo`, {
+      await fetch(`/api/plane/${hex}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: src, ...meta }),
@@ -127,7 +127,7 @@ export default function AircraftPage() {
     try {
       const fd = new FormData();
       fd.set("file", file);
-      await fetch(`/api/plane/${hex}/photo`, { method: "POST", body: fd });
+      await fetch(`/api/plane/${hex}`, { method: "POST", body: fd });
       await refreshed();
     } finally {
       setBusy(null);
@@ -137,7 +137,7 @@ export default function AircraftPage() {
   const setMode = async (mode: "auto" | "photo-only") => {
     setBusy(mode === "auto" ? "re-attempting cutout…" : "pinning photo only…");
     try {
-      await fetch(`/api/plane/${hex}/mode`, {
+      await fetch(`/api/plane/${hex}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode }),
