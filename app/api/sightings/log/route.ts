@@ -8,6 +8,7 @@ export async function GET(req: Request) {
     await querySightings({
       q: p.get("q") ?? undefined,
       date: p.get("date") ?? undefined,
+      tzOffsetMin: Math.max(-840, Math.min(840, Number(p.get("tz")) || 0)),
       sort: p.get("sort") ?? undefined,
       dir: p.get("dir") === "asc" ? "asc" : "desc",
       page: Number(p.get("page")) || 1,

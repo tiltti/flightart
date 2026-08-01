@@ -1,13 +1,7 @@
-import {
-  cutoutState,
-  ensureCutout,
-  markPhotoOnly,
-  resetCutout,
-} from "@/lib/cutout";
-import { hasPhotoFile } from "@/lib/photos";
+import { markPhotoOnly, resetCutout } from "@/lib/media";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 // "photo-only" pins the airframe to the gallery photo (no cutout attempts);
 // "auto" clears that and re-attempts the cutout right away.
@@ -22,18 +16,17 @@ export async function POST(
   const hex = raw.toLowerCase();
   const { mode } = (await req.json()) as { mode?: string };
 
-  if (mode === "photo-only") {
-    await markPhotoOnly(hex);
-  } else if (mode === "auto") {
-    await resetCutout(hex);
-    if (await hasPhotoFile(hex)) await ensureCutout(hex, "");
-  } else {
-    return Response.json({ error: "bad mode" }, { status: 400 });
-  }
-  const cutout = await cutoutState(hex);
+  const media =
+    mode === "photo-only"
+      ? await markPhotoOnly(hex)
+      : mode === "auto"
+        ? await resetCutout(hex)
+        : null;
+  if (!media) return Response.json({ error: "bad mode" }, { status: 400 });
+
   return Response.json({
     ok: true,
-    cutout,
-    cutoutUrl: cutout === "ok" ? `/api/cutout/${hex}` : null,
+    cutout: media.cutoutState,
+    cutoutUrl: media.cutoutUrl,
   });
 }

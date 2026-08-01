@@ -3,8 +3,13 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import type { PhotoMeta } from "@/lib/photos";
 import type { SightingRecord } from "@/lib/types";
+
+interface PhotoMeta {
+  photographer: string | null;
+  pageLink: string | null;
+  source: string | null;
+}
 
 const BTN =
   "border border-line px-4 py-2 font-mono text-[11px] uppercase tracking-[0.25em] text-faint transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-40";

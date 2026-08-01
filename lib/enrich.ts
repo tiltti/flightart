@@ -1,11 +1,6 @@
+import { after } from "next/server";
 import { USER_AGENT } from "@/lib/config";
-import { ensureCutout, hasCutout } from "@/lib/cutout";
-import {
-  ensurePhotoFile,
-  getPhotoMeta,
-  hasPhotoFile,
-  setPhotoMeta,
-} from "@/lib/photos";
+import { ensureCutout, getMedia, setPhotoFromUrl } from "@/lib/media";
 import type { Enrichment, PhotoInfo, RouteInfo } from "@/lib/types";
 
 // adsbdb.com: aircraft metadata + callsign routes. planespotters.net: photos
@@ -173,49 +168,36 @@ export async function getEnrichment(params: {
     params.callsign ? routeInfo(params.callsign) : Promise.resolve(null),
   ]);
 
-  // local disk is the source of truth for photos — the CDN is hit at most
-  // once per airframe, and user-chosen photos override everything
-  let servedPhoto: PhotoInfo | null = null;
-  if (await hasPhotoFile(hex)) {
-    let meta = await getPhotoMeta(hex);
-    if (!meta) {
-      // photo cached before credits were recorded — recover it once
-      const remote = await photoInfo(hex, params.registration ?? null);
-      if (remote) {
-        meta = {
-          photographer: remote.photographer,
-          pageLink: remote.pageLink,
-          source: "planespotters",
-        };
-        await setPhotoMeta(hex, meta);
-      }
-    }
-    servedPhoto = {
-      url: `/api/photo/${hex}`,
-      pageLink: meta?.pageLink ?? "",
-      photographer: meta?.photographer ?? "",
-    };
-  } else {
+  // stored media is the source of truth — the photo CDN is hit at most once
+  // per airframe, and user-chosen photos override everything
+  let media = await getMedia(hex);
+  if (!media?.photoUrl) {
     const remote = await photoInfo(hex, params.registration ?? null);
     if (remote) {
-      const localOk = await ensurePhotoFile(hex, remote.url);
-      if (localOk) {
-        await setPhotoMeta(hex, {
+      media =
+        (await setPhotoFromUrl(hex, remote.url, {
           photographer: remote.photographer,
           pageLink: remote.pageLink,
           source: "planespotters",
-        });
-      }
-      servedPhoto = localOk ? { ...remote, url: `/api/photo/${hex}` } : remote;
+        })) ?? media;
     }
   }
 
+  const servedPhoto: PhotoInfo | null = media?.photoUrl
+    ? {
+        url: media.photoUrl,
+        pageLink: media.pageLink ?? "",
+        photographer: media.photographer ?? "",
+      }
+    : null;
+
   let cutoutUrl: string | null = null;
-  if (servedPhoto) {
-    if (await hasCutout(hex)) {
-      cutoutUrl = `/api/cutout/${hex}`;
-    } else {
-      void ensureCutout(hex, servedPhoto.url); // ready for a later re-fetch
+  if (media?.photoUrl) {
+    if (media.cutoutState === "ok") {
+      cutoutUrl = media.cutoutUrl;
+    } else if (media.cutoutState === "none") {
+      // keep generating after the response is sent; a later poll picks it up
+      after(() => ensureCutout(hex).catch(() => {}));
     }
   }
   return {

@@ -1,5 +1,4 @@
-import { cutoutState } from "@/lib/cutout";
-import { getPhotoMeta, hasPhotoFile } from "@/lib/photos";
+import { getMedia } from "@/lib/media";
 import { sightingsForHex } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -13,13 +12,11 @@ export async function GET(
     return Response.json({ error: "bad hex" }, { status: 400 });
   }
   const hex = raw.toLowerCase();
-  const sightings = await sightingsForHex(hex);
-  const sample = sightings[0] ?? null;
-  const [hasPhoto, cutout, meta] = await Promise.all([
-    hasPhotoFile(hex),
-    cutoutState(hex),
-    getPhotoMeta(hex),
+  const [sightings, media] = await Promise.all([
+    sightingsForHex(hex),
+    getMedia(hex),
   ]);
+  const sample = sightings[0] ?? null;
   return Response.json({
     hex,
     registration: sample?.registration ?? null,
@@ -36,9 +33,11 @@ export async function GET(
       ? Math.max(...sightings.map((s) => s.maxAltFt ?? 0))
       : null,
     sightings: sightings.slice(0, 100),
-    photoUrl: hasPhoto ? `/api/photo/${hex}` : null,
-    photoMeta: meta,
-    cutout,
-    cutoutUrl: cutout === "ok" ? `/api/cutout/${hex}` : null,
+    photoUrl: media?.photoUrl ?? null,
+    photoMeta: media
+      ? { photographer: media.photographer, pageLink: media.pageLink, source: media.photoSource }
+      : null,
+    cutout: media?.cutoutState ?? "none",
+    cutoutUrl: media?.cutoutUrl ?? null,
   });
 }

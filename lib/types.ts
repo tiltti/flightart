@@ -92,7 +92,8 @@ export interface Summary {
 
 export interface LogQuery {
   q?: string;
-  date?: string; // YYYY-MM-DD, local day
+  date?: string; // YYYY-MM-DD in the viewer's local day
+  tzOffsetMin?: number; // minutes to add to UTC to get the viewer's local time
   sort?: string;
   dir?: "asc" | "desc";
   page?: number;

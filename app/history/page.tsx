@@ -182,6 +182,7 @@ export default function HistoryPage() {
         dir,
         page: String(page),
         per: "25",
+        tz: String(-new Date().getTimezoneOffset()),
       });
       if (q.trim()) p.set("q", q.trim());
       if (date) p.set("date", date);
@@ -205,7 +206,8 @@ export default function HistoryPage() {
   };
 
   useEffect(() => {
-    fetch("/api/sightings")
+    // the server buckets "by hour" and "today" in the viewer's timezone
+    fetch(`/api/sightings?tz=${-new Date().getTimezoneOffset()}`)
       .then((r) => r.json())
       .then(setSummary)
       .catch(() => {});

@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { HOME, RADIUS_NM } from "@/lib/config";
 import { coordsLabel } from "@/lib/geo";
 import { airfieldMarkers, fetchNearby } from "@/lib/sources/adsbfi";
@@ -49,7 +50,13 @@ export async function GET(req: Request) {
   }
   try {
     const aircraft = await fetchNearby(nm, home);
-    void recordAircraft(aircraft).catch(() => {});
+    // logging must not delay the radar frame, but must still run to completion
+    after(() =>
+      recordAircraft(aircraft).catch((err) => {
+        // a dropped sighting is exactly what the logbook exists to prevent
+        console.error("[flightart] recordAircraft failed:", err);
+      }),
+    );
     const payload: RadarPayload = {
       at: Date.now(),
       home: name,
