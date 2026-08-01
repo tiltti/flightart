@@ -242,9 +242,10 @@ async function generateCutout(hex: string): Promise<AirframeMedia> {
       cutout_state: "ok",
       rejected_reason: null,
     });
-  } catch {
+  } catch (err) {
     // background removal unavailable (e.g. missing native runtime) — leave the
     // state untouched so it can be retried from the aircraft page
+    console.error("[flightart] cutout failed for", hex, err);
     return media;
   }
 }
