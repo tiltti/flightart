@@ -50,6 +50,8 @@ export interface Enrichment {
   operator: string | null;
   route: RouteInfo | null;
   photo: PhotoInfo | null;
+  // the primary photo first, then any further gallery photos for the stack
+  photos: PhotoInfo[];
   cutoutUrl: string | null;
   // the flown route, as far as it reaches across the radar
   routeTrack: AirfieldMarker[];

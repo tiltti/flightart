@@ -59,7 +59,22 @@ const SCHEMA = [
      cutout_state TEXT NOT NULL DEFAULT 'none',
      rejected_reason TEXT,
      cutout_attempts INTEGER NOT NULL DEFAULT 0,
+     stack_collected_at INTEGER,
      updated_at INTEGER NOT NULL
+   )`,
+  // Extra gallery photos shown behind the primary one in the spotlight stack.
+  // The primary photo lives in airframe_media because it is the curated one:
+  // it is what the user replaces and what the cutout is derived from.
+  `CREATE TABLE IF NOT EXISTS airframe_photos (
+     hex TEXT NOT NULL,
+     slot INTEGER NOT NULL,
+     url TEXT NOT NULL,
+     key TEXT NOT NULL,
+     photographer TEXT,
+     page_link TEXT,
+     source TEXT,
+     collected_at INTEGER NOT NULL,
+     PRIMARY KEY (hex, slot)
    )`,
 ];
 

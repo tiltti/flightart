@@ -5,6 +5,7 @@ import CinematicText, {
   revealTiming,
   type Line,
 } from "@/components/CinematicText";
+import PhotoStack from "@/components/PhotoStack";
 import type { Settings } from "@/lib/settings";
 import type { Aircraft, Enrichment } from "@/lib/types";
 
@@ -157,6 +158,11 @@ export default function Spotlight({
   const liveStart = start + lines.length * stagger + 400;
 
   const photo = enrichment?.photo ?? null;
+  const photos = enrichment?.photos?.length
+    ? enrichment.photos
+    : photo
+      ? [photo]
+      : [];
   const cutout =
     settings.displayMode !== "photo" ? (enrichment?.cutoutUrl ?? null) : null;
 
@@ -238,21 +244,7 @@ export default function Spotlight({
       <div className="relative z-10 flex h-full flex-col px-10 pb-12 pt-10">
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden pt-10">
           {photo ? (
-            <figure
-              className="border border-line bg-panel/70 p-3 shadow-[0_30px_80px_rgba(0,0,0,0.55)] backdrop-blur-sm animate-[fa-rise_1.6s_ease_both]"
-              style={{ width: "min(46vw, 640px)" }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- gallery print */}
-              <img
-                src={photo.url}
-                alt={title}
-                className="block w-full"
-                style={{
-                  filter:
-                    "grayscale(0.15) saturate(0.85) contrast(1.05) brightness(0.96)",
-                }}
-              />
-            </figure>
+            <PhotoStack photos={photos} />
           ) : (
             <span className="select-none font-display text-[13rem] font-light leading-none tracking-widest text-ink/[0.05]">
               {(aircraft.typeCode ?? "✈").toUpperCase()}
@@ -266,11 +258,7 @@ export default function Spotlight({
         </div>
       </div>
 
-      {photo?.photographer && (
-        <div className="absolute bottom-4 right-5 z-10 font-mono text-[10px] uppercase tracking-[0.25em] text-faint">
-          photo — {photo.photographer}
-        </div>
-      )}
+      {/* credits live on each card's frame, so no combined line here */}
     </div>
   );
 }

@@ -3,7 +3,14 @@ import { airportCoords } from "@/lib/airfields";
 import { HOME, RADIUS_NM, USER_AGENT } from "@/lib/config";
 import { bearingDeg, distanceKm, greatCirclePoints } from "@/lib/geo";
 import type { AirfieldMarker } from "@/lib/types";
-import { ensureCutout, getMedia, setPhotoFromUrl } from "@/lib/media";
+import {
+  collectStackPhotos,
+  ensureCutout,
+  getMedia,
+  getStackPhotos,
+  setPhotoFromUrl,
+  stackCollected,
+} from "@/lib/media";
 import type { Enrichment, PhotoInfo, RouteInfo } from "@/lib/types";
 
 // adsbdb.com: aircraft metadata + callsign routes. planespotters.net: photos
@@ -217,6 +224,27 @@ export async function getEnrichment(params: {
       }
     : null;
 
+  const photos: PhotoInfo[] = servedPhoto ? [servedPhoto] : [];
+  if (media?.photoUrl) {
+    for (const extra of await getStackPhotos(hex)) {
+      photos.push({
+        url: extra.url,
+        pageLink: extra.pageLink ?? "",
+        photographer: extra.photographer ?? "",
+      });
+    }
+    if (!(await stackCollected(hex))) {
+      // gather the rest of the stack after the response has gone out
+      after(() =>
+        collectStackPhotos(
+          hex,
+          params.registration ?? info.registration,
+          media?.pageLink ?? null,
+        ),
+      );
+    }
+  }
+
   let cutoutUrl: string | null = null;
   if (media?.photoUrl) {
     if (media.cutoutState === "ok") {
@@ -233,6 +261,7 @@ export async function getEnrichment(params: {
     operator: route?.airline ?? info.operator,
     route,
     photo: servedPhoto,
+    photos,
     cutoutUrl,
     routeTrack: routeTrackFor(
       route,

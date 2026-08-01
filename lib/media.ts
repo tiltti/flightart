@@ -43,6 +43,7 @@ interface MediaRow {
   cutout_state: string;
   rejected_reason: string | null;
   cutout_attempts: number;
+  stack_collected_at: number | null;
 }
 
 function toMedia(r: MediaRow): AirframeMedia {
@@ -259,6 +260,108 @@ async function generateCutout(hex: string): Promise<AirframeMedia> {
     // state untouched so it can be retried from the aircraft page
     console.error("[flightart] cutout failed for", hex, err);
     return media;
+  }
+}
+
+// --- extra gallery photos for the spotlight stack ---
+
+export interface StackPhoto {
+  url: string;
+  photographer: string | null;
+  pageLink: string | null;
+  source: string | null;
+}
+
+const MAX_EXTRA_PHOTOS = 2;
+
+export async function getStackPhotos(hex: string): Promise<StackPhoto[]> {
+  await ready();
+  const res = await db().execute({
+    sql: "SELECT url, photographer, page_link, source FROM airframe_photos WHERE hex = ? ORDER BY slot",
+    args: [hex],
+  });
+  return (
+    res.rows as unknown as {
+      url: string;
+      photographer: string | null;
+      page_link: string | null;
+      source: string | null;
+    }[]
+  ).map((r) => ({
+    url: r.url,
+    photographer: r.photographer,
+    pageLink: r.page_link,
+    source: r.source,
+  }));
+}
+
+// True once collection has run, even if it found nothing, so an airframe with
+// only one known photo is not searched again on every appearance.
+export async function stackCollected(hex: string): Promise<boolean> {
+  await ready();
+  const res = await db().execute({
+    sql: "SELECT stack_collected_at FROM airframe_media WHERE hex = ?",
+    args: [hex],
+  });
+  const row = res.rows[0] as unknown as { stack_collected_at: number | null } | undefined;
+  return Boolean(row?.stack_collected_at);
+}
+
+const gs = globalThis as unknown as { __faStackJobs?: Set<string> };
+const stackJobs = (gs.__faStackJobs ??= new Set());
+
+// Downloads up to two further photos of the airframe so the spotlight can show
+// a stack. Never re-hosts a photo without a photographer credit.
+export async function collectStackPhotos(
+  hex: string,
+  registration: string | null,
+  primaryPageLink: string | null,
+): Promise<void> {
+  if (stackJobs.has(hex)) return;
+  stackJobs.add(hex);
+  try {
+    if (await stackCollected(hex)) return;
+    const { findCandidates } = await import("@/lib/galleries");
+    const candidates = (await findCandidates(hex, registration)).filter(
+      (c) => c.photographer && c.link !== primaryPageLink,
+    );
+
+    let slot = 1;
+    for (const c of candidates) {
+      if (slot > MAX_EXTRA_PHOTOS) break;
+      try {
+        const res = await fetch(c.full, {
+          headers: { "User-Agent": USER_AGENT },
+          signal: AbortSignal.timeout(20_000),
+        });
+        if (!res.ok) continue;
+        const sharp = (await import("sharp")).default;
+        const jpg = await sharp(Buffer.from(await res.arrayBuffer()))
+          .rotate()
+          .resize({ width: 1000, withoutEnlargement: true })
+          .jpeg({ quality: 84 })
+          .toBuffer();
+        const stored = await putBlob(`photos/${hex}-${slot}.jpg`, jpg, "image/jpeg");
+        await db().execute({
+          sql: `INSERT INTO airframe_photos (hex, slot, url, key, photographer, page_link, source, collected_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(hex, slot) DO UPDATE SET
+                  url = excluded.url, key = excluded.key,
+                  photographer = excluded.photographer,
+                  page_link = excluded.page_link, source = excluded.source,
+                  collected_at = excluded.collected_at`,
+          args: [hex, slot, stored.url, stored.key, c.photographer, c.link, c.source, Date.now()],
+        });
+        slot++;
+      } catch {
+        // a candidate that will not download is simply skipped
+      }
+    }
+    await upsert(hex, { stack_collected_at: String(Date.now()) });
+  } catch {
+    // collection is decorative; never let it surface as a failure
+  } finally {
+    stackJobs.delete(hex);
   }
 }
 

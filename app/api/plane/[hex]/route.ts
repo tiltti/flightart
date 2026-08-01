@@ -1,7 +1,8 @@
-import { USER_AGENT } from "@/lib/config";
+import { findCandidates } from "@/lib/galleries";
 import {
   ensureCutout,
   getMedia,
+  getStackPhotos,
   markPhotoOnly,
   resetCutout,
   setPhotoFromBytes,
@@ -17,99 +18,6 @@ function parseHex(raw: string): string | null {
   return /^[0-9a-f]{6}$/i.test(raw) ? raw.toLowerCase() : null;
 }
 
-// --- photo candidates from the public galleries ---
-
-interface PhotoCandidate {
-  id: string;
-  thumb: string;
-  full: string;
-  source: string;
-  photographer: string;
-  link: string;
-}
-
-async function getJson(url: string): Promise<unknown | null> {
-  try {
-    const res = await fetch(url, {
-      cache: "no-store",
-      headers: { "User-Agent": USER_AGENT },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
-interface PsPhoto {
-  id?: string;
-  thumbnail_large?: { src?: string };
-  link?: string;
-  photographer?: string;
-}
-
-async function planespotters(path: string): Promise<PhotoCandidate[]> {
-  const body = (await getJson(
-    `https://api.planespotters.net/pub/photos/${path}`,
-  )) as { photos?: PsPhoto[] } | null;
-  return (body?.photos ?? [])
-    .filter((p) => p.thumbnail_large?.src)
-    .map((p) => ({
-      id: `ps-${p.id ?? p.thumbnail_large!.src}`,
-      thumb: p.thumbnail_large!.src!,
-      full: p.thumbnail_large!.src!,
-      source: "planespotters",
-      photographer: p.photographer ?? "planespotters.net",
-      link: p.link ?? "https://www.planespotters.net",
-    }));
-}
-
-interface CommonsPage {
-  title?: string;
-  imageinfo?: {
-    thumburl?: string;
-    descriptionurl?: string;
-    extmetadata?: { Artist?: { value?: string } };
-    mime?: string;
-  }[];
-}
-
-async function commons(reg: string): Promise<PhotoCandidate[]> {
-  const q = new URLSearchParams({
-    action: "query",
-    format: "json",
-    origin: "*",
-    generator: "search",
-    gsrsearch: `"${reg}" aircraft`,
-    gsrnamespace: "6",
-    gsrlimit: "12",
-    prop: "imageinfo",
-    iiprop: "url|extmetadata|mime",
-    iiurlwidth: "800",
-  });
-  const body = (await getJson(`https://commons.wikimedia.org/w/api.php?${q}`)) as {
-    query?: { pages?: Record<string, CommonsPage> };
-  } | null;
-  return Object.values(body?.query?.pages ?? {})
-    .map((p) => {
-      const ii = p.imageinfo?.[0];
-      if (!ii?.thumburl || !/^image\/(jpeg|png)/.test(ii.mime ?? "")) return null;
-      const artist = (ii.extmetadata?.Artist?.value ?? "")
-        .replace(/<[^>]*>/g, "")
-        .trim();
-      return {
-        id: `wc-${p.title}`,
-        thumb: ii.thumburl,
-        full: ii.thumburl,
-        source: "commons",
-        photographer: artist || "Wikimedia Commons",
-        link: ii.descriptionurl ?? "https://commons.wikimedia.org",
-      };
-    })
-    .filter((c): c is PhotoCandidate => c !== null);
-}
-
 // GET /api/plane/<hex>             — details, sighting history and media state
 // GET /api/plane/<hex>?candidates= — photo candidates from the galleries
 export async function GET(
@@ -121,22 +29,16 @@ export async function GET(
   const search = new URL(req.url).searchParams;
 
   if (search.has("candidates")) {
-    const reg = search.get("reg")?.trim() ?? "";
-    const [psHex, psReg, wc] = await Promise.all([
-      planespotters(`hex/${hex}`),
-      reg ? planespotters(`reg/${encodeURIComponent(reg)}`) : Promise.resolve([]),
-      reg ? commons(reg) : Promise.resolve([]),
-    ]);
-    const seen = new Set<string>();
-    const candidates = [...psHex, ...psReg, ...wc].filter((c) => {
-      if (seen.has(c.thumb)) return false;
-      seen.add(c.thumb);
-      return true;
+    return Response.json({
+      candidates: await findCandidates(hex, search.get("reg")),
     });
-    return Response.json({ candidates });
   }
 
-  const [sightings, media] = await Promise.all([sightingsForHex(hex), getMedia(hex)]);
+  const [sightings, media, stack] = await Promise.all([
+    sightingsForHex(hex),
+    getMedia(hex),
+    getStackPhotos(hex),
+  ]);
   const sample = sightings[0] ?? null;
   return Response.json({
     hex,
@@ -162,14 +64,15 @@ export async function GET(
           source: media.photoSource,
         }
       : null,
+    stackPhotos: stack,
     cutout: media?.cutoutState ?? "none",
     cutoutUrl: media?.cutoutUrl ?? null,
   });
 }
 
 // POST /api/plane/<hex>
-//   multipart body           — replace the photo with an upload
-//   {url, photographer, …}   — replace the photo from a gallery pick or address
+//   multipart body              — replace the photo with an upload
+//   {url, photographer, …}      — replace the photo from a gallery pick or address
 //   {mode: 'auto'|'photo-only'} — retry background removal, or pin to the photo
 export async function POST(
   req: Request,
