@@ -52,3 +52,57 @@ async function download(hex: string, remoteUrl: string): Promise<boolean> {
     return false;
   }
 }
+
+// --- per-airframe photo metadata (credit + source), persisted on disk ---
+
+export interface PhotoMeta {
+  photographer?: string;
+  pageLink?: string;
+  source?: string; // "planespotters" | "commons" | "url" | "upload"
+}
+
+const META_FILE = path.join(DIR, "photo-meta.json");
+const gm = globalThis as unknown as {
+  __faPhotoMeta?: Promise<Record<string, PhotoMeta>>;
+};
+
+async function metaAll(): Promise<Record<string, PhotoMeta>> {
+  gm.__faPhotoMeta ??= (async () => {
+    try {
+      return JSON.parse(await fs.readFile(META_FILE, "utf8"));
+    } catch {
+      return {};
+    }
+  })();
+  return gm.__faPhotoMeta;
+}
+
+export async function getPhotoMeta(hex: string): Promise<PhotoMeta | null> {
+  return (await metaAll())[hex] ?? null;
+}
+
+export async function setPhotoMeta(hex: string, meta: PhotoMeta): Promise<void> {
+  const all = await metaAll();
+  all[hex] = meta;
+  await fs.mkdir(DIR, { recursive: true });
+  await fs.writeFile(META_FILE, JSON.stringify(all, null, 1));
+}
+
+// Replace an airframe's photo with user-chosen bytes: normalized to jpeg,
+// old cutout/rejection state is the caller's responsibility.
+export async function replacePhoto(
+  hex: string,
+  bytes: Buffer,
+  meta: PhotoMeta,
+): Promise<void> {
+  const sharp = (await import("sharp")).default;
+  const jpg = await sharp(bytes)
+    .rotate()
+    .resize({ width: 1400, withoutEnlargement: true })
+    .jpeg({ quality: 88 })
+    .toBuffer();
+  await fs.mkdir(DIR, { recursive: true });
+  await fs.writeFile(photoFile(hex), jpg);
+  await setPhotoMeta(hex, meta);
+  jobs.set(hex, Promise.resolve(true)); // local file now exists
+}

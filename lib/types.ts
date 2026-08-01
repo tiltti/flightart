@@ -22,6 +22,7 @@ export interface AirfieldMarker {
 export interface RadarPayload {
   at: number;
   home: string;
+  homeCoords: string;
   radiusKm: number;
   airfields: AirfieldMarker[];
   aircraft: Aircraft[];
@@ -87,4 +88,20 @@ export interface Stats {
 export interface Summary {
   stats: Stats;
   recent: SightingRecord[];
+}
+
+export interface LogQuery {
+  q?: string;
+  date?: string; // YYYY-MM-DD, local day
+  sort?: string;
+  dir?: "asc" | "desc";
+  page?: number;
+  per?: number;
+}
+
+export interface LogPage {
+  rows: SightingRecord[];
+  total: number;
+  page: number;
+  per: number;
 }

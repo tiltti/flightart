@@ -3,6 +3,8 @@ import path from "path";
 import type {
   Aircraft,
   Enrichment,
+  LogPage,
+  LogQuery,
   SightingRecord,
   Summary,
 } from "@/lib/types";
@@ -104,6 +106,74 @@ export async function recordSpotlight(e: Enrichment): Promise<void> {
   rec.destCity ??= e.route?.destCity ?? null;
   rec.photoUrl ??= e.photo?.url ?? null;
   persist(st);
+}
+
+const SORT_KEYS: Record<
+  string,
+  (s: SightingRecord) => string | number | null
+> = {
+  time: (s) => s.lastSeen,
+  reg: (s) => s.registration ?? s.hex,
+  type: (s) => s.typeCode,
+  operator: (s) => s.operator,
+  route: (s) =>
+    s.originIata && s.destIata ? `${s.originIata}-${s.destIata}` : null,
+  dist: (s) => s.minDistanceKm,
+  alt: (s) => s.maxAltFt,
+};
+
+export async function querySightings(qy: LogQuery): Promise<LogPage> {
+  const st = await state();
+  let rows: SightingRecord[] = st.data.sightings;
+
+  if (qy.date) {
+    const start = new Date(`${qy.date}T00:00:00`).getTime();
+    if (Number.isFinite(start)) {
+      const end = start + 24 * 60 * 60 * 1000;
+      rows = rows.filter((s) => s.lastSeen >= start && s.lastSeen < end);
+    }
+  }
+  if (qy.q?.trim()) {
+    const needle = qy.q.trim().toUpperCase();
+    rows = rows.filter((s) =>
+      [
+        s.registration,
+        s.callsign,
+        s.hex,
+        s.typeCode,
+        s.typeName,
+        s.operator,
+        s.originIata,
+        s.originCity,
+        s.destIata,
+        s.destCity,
+      ].some((v) => v?.toUpperCase().includes(needle)),
+    );
+  }
+
+  const key = SORT_KEYS[qy.sort ?? "time"] ?? SORT_KEYS.time;
+  const dir = qy.dir === "asc" ? 1 : -1;
+  rows = [...rows].sort((a, b) => {
+    const va = key(a);
+    const vb = key(b);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1; // nulls last regardless of direction
+    if (vb == null) return -1;
+    return va < vb ? -dir : va > vb ? dir : 0;
+  });
+
+  const per = Math.min(100, Math.max(5, qy.per ?? 25));
+  const total = rows.length;
+  const pageCount = Math.max(1, Math.ceil(total / per));
+  const page = Math.min(pageCount, Math.max(1, qy.page ?? 1));
+  return { rows: rows.slice((page - 1) * per, page * per), total, page, per };
+}
+
+export async function sightingsForHex(hex: string): Promise<SightingRecord[]> {
+  const st = await state();
+  return st.data.sightings
+    .filter((s) => s.hex === hex.toLowerCase())
+    .sort((a, b) => b.lastSeen - a.lastSeen);
 }
 
 export async function getSummary(): Promise<Summary> {

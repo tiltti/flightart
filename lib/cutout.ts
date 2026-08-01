@@ -92,6 +92,33 @@ export function ensureCutout(hex: string, photoUrl: string): Promise<boolean> {
   return job;
 }
 
+export type CutoutState = "ok" | "rejected" | "none";
+
+export async function cutoutState(hex: string): Promise<CutoutState> {
+  if (await hasCutout(hex)) return "ok";
+  try {
+    await fs.access(rejectedFile(hex));
+    return "rejected";
+  } catch {
+    return "none";
+  }
+}
+
+// forget both the cutout and any rejection so it can be re-attempted
+export async function resetCutout(hex: string): Promise<void> {
+  jobs.delete(hex);
+  await fs.rm(cutoutFile(hex), { force: true });
+  await fs.rm(rejectedFile(hex), { force: true });
+}
+
+// user says this airframe never gets a poster cutout — gallery photo only
+export async function markPhotoOnly(hex: string): Promise<void> {
+  jobs.delete(hex);
+  await fs.rm(cutoutFile(hex), { force: true });
+  await fs.mkdir(DIR, { recursive: true });
+  await fs.writeFile(rejectedFile(hex), "manual");
+}
+
 async function generate(hex: string, photoUrl: string): Promise<boolean> {
   try {
     if (await hasCutout(hex)) return true;

@@ -15,6 +15,20 @@ export function distanceKm(
   return 2 * R_KM * Math.asin(Math.sqrt(a));
 }
 
+export function coordsLabel(lat: number, lon: number): string {
+  const part = (v: number, pos: string, neg: string) => {
+    const abs = Math.abs(v);
+    let deg = Math.floor(abs);
+    let min = Math.round((abs - deg) * 60);
+    if (min === 60) {
+      deg += 1;
+      min = 0;
+    }
+    return `${deg}°${String(min).padStart(2, "0")}′${v >= 0 ? pos : neg}`;
+  };
+  return `${part(lat, "N", "S")} ${part(lon, "E", "W")}`;
+}
+
 export function bearingDeg(
   lat1: number,
   lon1: number,

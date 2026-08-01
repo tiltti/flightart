@@ -16,9 +16,18 @@
   --font-deco: var(--font-poiret);
 }
 
+:root {
+  color-scheme: dark;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-ink);
+}
+
+/* dark-mode treatment for OSM tiles in the settings map picker */
+.fa-map .leaflet-tile {
+  filter: invert(1) hue-rotate(180deg) saturate(0.35) brightness(0.85);
 }
 
 @keyframes fa-fade {

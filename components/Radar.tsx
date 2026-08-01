@@ -19,6 +19,7 @@ interface Props {
   radiusKm: number;
   selectedHex: string | null;
   queuedHexes?: string[];
+  geo?: number[][][] | null;
   onSelect?: (hex: string) => void;
 }
 
@@ -28,6 +29,7 @@ export default function Radar({
   radiusKm,
   selectedHex,
   queuedHexes,
+  geo,
   onSelect,
 }: Props) {
   const trails = useRef(new Map<string, { x: number; y: number }[]>());
@@ -64,6 +66,26 @@ export default function Radar({
         viewBox={`-${VIEW} -${VIEW} ${VIEW * 2} ${VIEW * 2}`}
         className="relative h-full w-full"
       >
+        <defs>
+          <clipPath id="fa-radar-clip">
+            <circle r={OUTER} />
+          </clipPath>
+        </defs>
+
+        {geo && geo.length > 0 && (
+          <g clipPath="url(#fa-radar-clip)" opacity="0.5">
+            {geo.map((path, i) => (
+              <polyline
+                key={i}
+                points={path.map(([x, y]) => `${x},${y}`).join(" ")}
+                className="fill-none stroke-dim"
+                strokeWidth="0.35"
+                strokeLinejoin="round"
+              />
+            ))}
+          </g>
+        )}
+
         <circle r={OUTER} className="fill-none stroke-line" strokeWidth="0.5" />
         {rings.map((km) => (
           <g key={km}>

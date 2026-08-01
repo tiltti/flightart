@@ -4,7 +4,54 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSettings } from "@/lib/settings";
-import type { SightingRecord, Summary } from "@/lib/types";
+import type { LogPage, SightingRecord, Summary } from "@/lib/types";
+
+const INPUT =
+  "border border-line bg-transparent px-3 py-2 font-mono text-xs uppercase tracking-[0.15em] text-ink placeholder:text-faint focus:border-accent/40 focus:outline-none";
+
+// text columns default ascending, time/distance descending
+const DEFAULT_DIR: Record<string, "asc" | "desc"> = {
+  time: "desc",
+  dist: "desc",
+  alt: "desc",
+  reg: "asc",
+  type: "asc",
+  operator: "asc",
+  route: "asc",
+};
+
+function Th({
+  id,
+  label,
+  right,
+  sort,
+  dir,
+  onSort,
+}: {
+  id: string;
+  label: string;
+  right?: boolean;
+  sort: string;
+  dir: "asc" | "desc";
+  onSort: (id: string) => void;
+}) {
+  const active = sort === id;
+  return (
+    <th
+      className={`border-b border-line pb-2 ${right ? "" : "pr-4"} font-normal`}
+    >
+      <button
+        onClick={() => onSort(id)}
+        className={`uppercase tracking-[0.2em] transition-colors ${
+          right ? "w-full text-right" : ""
+        } ${active ? "text-accent" : "text-faint hover:text-dim"}`}
+      >
+        {label}
+        {active ? (dir === "asc" ? " ↑" : " ↓") : ""}
+      </button>
+    </th>
+  );
+}
 
 function Tile({ label, value }: { label: string; value: string | number }) {
   return (
@@ -121,6 +168,41 @@ export default function HistoryPage() {
   const router = useRouter();
   const [settings] = useSettings();
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [log, setLog] = useState<LogPage | null>(null);
+  const [q, setQ] = useState("");
+  const [date, setDate] = useState("");
+  const [sort, setSort] = useState("time");
+  const [dir, setDir] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      const p = new URLSearchParams({
+        sort,
+        dir,
+        page: String(page),
+        per: "25",
+      });
+      if (q.trim()) p.set("q", q.trim());
+      if (date) p.set("date", date);
+      try {
+        setLog(await fetch(`/api/sightings/log?${p}`).then((r) => r.json()));
+      } catch {
+        // keep previous rows on transient failures
+      }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q, date, sort, dir, page]);
+
+  const onSort = (id: string) => {
+    if (id === sort) {
+      setDir(dir === "asc" ? "desc" : "asc");
+    } else {
+      setSort(id);
+      setDir(DEFAULT_DIR[id] ?? "asc");
+    }
+    setPage(1);
+  };
 
   useEffect(() => {
     fetch("/api/sightings")
@@ -203,23 +285,71 @@ export default function HistoryPage() {
 
           <section className="pb-10">
             <h2 className="mb-5 font-mono text-[10px] uppercase tracking-[0.35em] text-faint">
-              Recent sightings
+              Sightings
             </h2>
+
+            <div className="mb-5 flex flex-wrap items-center gap-4">
+              <input
+                value={q}
+                placeholder="SEARCH — REG, TYPE, OPERATOR, ROUTE…"
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setPage(1);
+                }}
+                className={`${INPUT} w-80`}
+              />
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => {
+                  setDate(e.target.value);
+                  setPage(1);
+                }}
+                className={INPUT}
+              />
+              {(q || date) && (
+                <button
+                  onClick={() => {
+                    setQ("");
+                    setDate("");
+                    setPage(1);
+                  }}
+                  className="font-mono text-[11px] uppercase tracking-[0.25em] text-faint transition-colors hover:text-accent"
+                >
+                  clear
+                </button>
+              )}
+              <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.25em] text-faint">
+                {log ? `${log.total} sightings` : "…"}
+              </span>
+            </div>
+
             <table className="w-full border-collapse font-mono text-xs">
               <thead>
-                <tr className="text-left uppercase tracking-[0.2em] text-faint">
-                  <th className="border-b border-line pb-2 pr-4 font-normal">Time</th>
-                  <th className="border-b border-line pb-2 pr-4 font-normal">Reg</th>
-                  <th className="border-b border-line pb-2 pr-4 font-normal">Type</th>
-                  <th className="border-b border-line pb-2 pr-4 font-normal">Operator</th>
-                  <th className="border-b border-line pb-2 pr-4 font-normal">Route</th>
-                  <th className="border-b border-line pb-2 text-right font-normal">
-                    Min dist
-                  </th>
+                <tr className="text-left">
+                  <Th id="time" label="Time" sort={sort} dir={dir} onSort={onSort} />
+                  <Th id="reg" label="Reg" sort={sort} dir={dir} onSort={onSort} />
+                  <Th id="type" label="Type" sort={sort} dir={dir} onSort={onSort} />
+                  <Th
+                    id="operator"
+                    label="Operator"
+                    sort={sort}
+                    dir={dir}
+                    onSort={onSort}
+                  />
+                  <Th id="route" label="Route" sort={sort} dir={dir} onSort={onSort} />
+                  <Th
+                    id="dist"
+                    label="Min dist"
+                    right
+                    sort={sort}
+                    dir={dir}
+                    onSort={onSort}
+                  />
                 </tr>
               </thead>
               <tbody className="text-dim">
-                {recent.map((s) => (
+                {(log?.rows ?? []).map((s) => (
                   <tr key={s.id}>
                     <td className="border-b border-line py-2 pr-4 whitespace-nowrap">
                       {new Date(s.lastSeen).toLocaleString("fi-FI", {
@@ -229,8 +359,13 @@ export default function HistoryPage() {
                         minute: "2-digit",
                       })}
                     </td>
-                    <td className="border-b border-line py-2 pr-4 uppercase text-ink">
-                      {s.registration ?? s.hex}
+                    <td className="border-b border-line py-2 pr-4 uppercase">
+                      <Link
+                        href={`/aircraft/${s.hex}`}
+                        className="text-ink transition-colors hover:text-accent"
+                      >
+                        {s.registration ?? s.hex}
+                      </Link>
                     </td>
                     <td className="border-b border-line py-2 pr-4 uppercase">
                       {s.typeCode ?? "—"}
@@ -248,8 +383,40 @@ export default function HistoryPage() {
                     </td>
                   </tr>
                 ))}
+                {log && log.rows.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="py-6 text-center uppercase tracking-[0.25em] text-faint"
+                    >
+                      no matches
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
+
+            {log && log.total > log.per && (
+              <div className="mt-5 flex items-center justify-between font-mono text-[11px] uppercase tracking-[0.25em] text-faint">
+                <button
+                  disabled={log.page <= 1}
+                  onClick={() => setPage(log.page - 1)}
+                  className="transition-colors hover:text-accent disabled:opacity-30 disabled:hover:text-faint"
+                >
+                  ← prev
+                </button>
+                <span>
+                  page {log.page} / {Math.ceil(log.total / log.per)}
+                </span>
+                <button
+                  disabled={log.page >= Math.ceil(log.total / log.per)}
+                  onClick={() => setPage(log.page + 1)}
+                  className="transition-colors hover:text-accent disabled:opacity-30 disabled:hover:text-faint"
+                >
+                  next →
+                </button>
+              </div>
+            )}
           </section>
         </div>
       )}

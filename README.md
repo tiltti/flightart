@@ -9,18 +9,29 @@ Kaikki bongaukset kertyvät lokikirjaan (`/history`).
 
 ```bash
 npm run dev
-# http://localhost:3000         — päänäyttö
-# http://localhost:3000/history — lokikirja ja statsit
+# http://localhost:3005          — päänäyttö (tutka + spotlight)
+# http://localhost:3005/history  — lokikirja, statsit, haku ja suodattimet
+# http://localhost:3005/settings — asetukset (sijainti, näyttö, rotaatio, data)
 ```
 
-Kotipiste ja säde: `.env.local`
+Konesivu `/aircraft/<hex>` avautuu lokikirjan rekisteritunnuksesta: montako
+kertaa nähty, koko bongaushistoria, kuvat — ja työkalut kuvan vaihtoon
+(galleriahaku, oma URL, upload), taustanpoiston uusintayritykseen sekä
+"photo only" -merkintään jos taustanpoisto ei tuota järkevää tulosta.
+
+Kotipisteen ja säteen oletukset: `.env.local`
 
 ```
 HOME_NAME=LOHJA
 HOME_LAT=60.250
 HOME_LON=24.065
-RADIUS_NM=40
+RADIUS_NM=50
+CONTACT_EMAIL=…        # planespotters vaatii yhteystiedon User-Agentiin
 ```
+
+Asetussivulta ne voi yliajaa selainkohtaisesti: sijainnin saa selaimen
+paikannuksesta tai klikkaamalla karttaa, säteen liukurilla (esikatselu
+vieressä), ja tutkan taakse voi kytkeä rannikko- ja rajaviivat.
 
 ## Datalähteet
 
@@ -29,6 +40,8 @@ RADIUS_NM=40
 | [adsb.fi](https://adsb.fi) opendata | lähialueen koneet (readsb JSON) | suomalainen yhteisöverkko; max ~1 req/s, serveri välimuistittaa |
 | [adsbdb.com](https://www.adsbdb.com) | konetyyppi, omistaja, callsign → reitti | |
 | [Planespotters.net](https://www.planespotters.net) photo API | kuva kyseisestä yksilöstä | vaatii kuvaajan krediitin + linkin — näkyy spotlightin kulmassa |
+| [Wikimedia Commons](https://commons.wikimedia.org) | vaihtoehtoiset kuvat galleriahaussa | vapaasti lisensoituja, tekijä talletetaan metatietoihin |
+| [world-atlas](https://github.com/topojson/world-atlas) (Natural Earth 1:10m) | tutkan rannikko- ja rajaviivat | public domain, mukana paketissa — ei verkkohakuja |
 
 Kuvat cachetetaan levylle: alkuperäiskuva `data/photos/<hex>.jpg` ja
 taustanpoistettu poster-cutout `data/cutouts/<hex>.png` — yksi CDN-haku per

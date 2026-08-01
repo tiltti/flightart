@@ -21,8 +21,16 @@ interface AdsbFiAircraft {
   seen_pos?: number;
 }
 
-export async function fetchNearby(nm: number = RADIUS_NM): Promise<Aircraft[]> {
-  const url = `https://opendata.adsb.fi/api/v2/lat/${HOME.lat}/lon/${HOME.lon}/dist/${nm}`;
+export interface HomePoint {
+  lat: number;
+  lon: number;
+}
+
+export async function fetchNearby(
+  nm: number = RADIUS_NM,
+  home: HomePoint = HOME,
+): Promise<Aircraft[]> {
+  const url = `https://opendata.adsb.fi/api/v2/lat/${home.lat}/lon/${home.lon}/dist/${nm}`;
   const res = await fetch(url, {
     cache: "no-store",
     headers: { "User-Agent": USER_AGENT },
@@ -52,17 +60,17 @@ export async function fetchNearby(nm: number = RADIUS_NM): Promise<Aircraft[]> {
       gsKt: a.gs ?? null,
       track: a.track ?? null,
       vertRateFpm: a.baro_rate ?? null,
-      distanceKm: distanceKm(HOME.lat, HOME.lon, a.lat as number, a.lon as number),
-      bearingDeg: bearingDeg(HOME.lat, HOME.lon, a.lat as number, a.lon as number),
+      distanceKm: distanceKm(home.lat, home.lon, a.lat as number, a.lon as number),
+      bearingDeg: bearingDeg(home.lat, home.lon, a.lat as number, a.lon as number),
       seenSec: a.seen ?? 0,
     }))
     .sort((a, b) => a.distanceKm - b.distanceKm);
 }
 
-export function airfieldMarkers(): AirfieldMarker[] {
+export function airfieldMarkers(home: HomePoint = HOME): AirfieldMarker[] {
   return AIRFIELDS.map((f) => ({
     code: f.code,
-    distanceKm: distanceKm(HOME.lat, HOME.lon, f.lat, f.lon),
-    bearingDeg: bearingDeg(HOME.lat, HOME.lon, f.lat, f.lon),
+    distanceKm: distanceKm(home.lat, home.lon, f.lat, f.lon),
+    bearingDeg: bearingDeg(home.lat, home.lon, f.lat, f.lon),
   }));
 }

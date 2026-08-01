@@ -7,6 +7,7 @@ import DecoFrame from "@/components/DecoFrame";
 import Radar from "@/components/Radar";
 import Spotlight from "@/components/Spotlight";
 import { useSettings } from "@/lib/settings";
+import { useGeoOutline } from "@/lib/useGeoOutline";
 import type {
   Aircraft,
   Enrichment,
@@ -59,6 +60,13 @@ export default function Home() {
   const [idleStats, setIdleStats] = useState<Stats | null>(null);
   const [queue, setQueue] = useState<string[]>([]);
 
+  const geo = useGeoOutline(
+    settings.showMap,
+    settings.homeLat ?? 60.25,
+    settings.homeLon ?? 24.065,
+    settings.radarNm,
+  );
+
   const featuredAt = useRef(new Map<string, number>());
   const selectedHexRef = useRef<string | null>(null);
   const selectedSince = useRef(0);
@@ -67,9 +75,15 @@ export default function Home() {
 
   useEffect(() => {
     let live = true;
+    const q = new URLSearchParams({ nm: String(settings.radarNm) });
+    if (settings.homeLat != null && settings.homeLon != null) {
+      q.set("lat", String(settings.homeLat));
+      q.set("lon", String(settings.homeLon));
+    }
+    if (settings.homeName) q.set("name", settings.homeName);
     const tick = async () => {
       try {
-        const res = await fetch(`/api/aircraft?nm=${settings.radarNm}`);
+        const res = await fetch(`/api/aircraft?${q}`);
         const payload = (await res.json()) as RadarPayload;
         if (live) setData(payload);
       } catch {
@@ -82,7 +96,13 @@ export default function Home() {
       live = false;
       clearInterval(id);
     };
-  }, [settings.pollSec, settings.radarNm]);
+  }, [
+    settings.pollSec,
+    settings.radarNm,
+    settings.homeLat,
+    settings.homeLon,
+    settings.homeName,
+  ]);
 
   const feature = useCallback(async (a: Aircraft) => {
     setSelected(a);
@@ -222,6 +242,7 @@ export default function Home() {
             aircraft={selected}
             enrichment={enrichment}
             settings={settings}
+            footer={data ? `${data.homeCoords} · ${data.home}` : ""}
           />
         ) : (
           <Idle stats={idleStats} error={data?.error} />
@@ -230,11 +251,13 @@ export default function Home() {
 
       <aside className="relative flex flex-1 items-center justify-center p-10">
         <Radar
+          key={`${settings.homeLat}:${settings.homeLon}:${settings.radarNm}`}
           aircraft={data?.aircraft ?? []}
           airfields={data?.airfields ?? []}
           radiusKm={data?.radiusKm ?? settings.radarNm * 1.852}
           selectedHex={selected?.hex ?? null}
           queuedHexes={queue}
+          geo={geo}
           onSelect={(hex) => {
             const a = data?.aircraft.find((x) => x.hex === hex);
             if (!a || a.hex === selected?.hex || queue.includes(hex)) return;

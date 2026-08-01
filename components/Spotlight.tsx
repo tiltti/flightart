@@ -12,6 +12,7 @@ interface Props {
   aircraft: Aircraft;
   enrichment: Enrichment | null;
   settings: Settings;
+  footer?: string;
 }
 
 // muted print-field colors for poster mode, picked per airframe
@@ -112,7 +113,12 @@ function LiveRow({
   );
 }
 
-export default function Spotlight({ aircraft, enrichment, settings }: Props) {
+export default function Spotlight({
+  aircraft,
+  enrichment,
+  settings,
+  footer,
+}: Props) {
   const title = (
     aircraft.registration ??
     enrichment?.registration ??
@@ -190,8 +196,8 @@ export default function Spotlight({ aircraft, enrichment, settings }: Props) {
             </div>
           </div>
           <div className="absolute inset-x-9 bottom-4 z-10 flex justify-between font-mono text-[9px] uppercase tracking-[0.3em] text-faint">
-            <span>60°15′N 24°04′E · LOHJA</span>
-            {photo && <span>photo — {photo.photographer}</span>}
+            <span>{footer}</span>
+            {photo?.photographer && <span>photo — {photo.photographer}</span>}
           </div>
         </div>
       </div>
@@ -255,7 +261,7 @@ export default function Spotlight({ aircraft, enrichment, settings }: Props) {
         </div>
       </div>
 
-      {photo && (
+      {photo?.photographer && (
         <div className="absolute bottom-4 right-5 z-10 font-mono text-[10px] uppercase tracking-[0.25em] text-faint">
           photo — {photo.photographer}
         </div>

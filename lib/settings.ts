@@ -13,6 +13,10 @@ export interface Settings {
   rotatePages: boolean; // rotate display <-> log
   rotateIntervalMin: number; // show the log every N minutes
   rotateLogSec: number; // how long the log stays up
+  showMap: boolean; // coastline / border outline behind the radar
+  homeLat: number | null; // null = server default from .env
+  homeLon: number | null;
+  homeName: string | null; // shown in the header; null = auto
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -25,6 +29,10 @@ export const DEFAULT_SETTINGS: Settings = {
   rotatePages: false,
   rotateIntervalMin: 10,
   rotateLogSec: 30,
+  showMap: true,
+  homeLat: null,
+  homeLon: null,
+  homeName: null,
 };
 
 const KEY = "flightart-settings";
