@@ -226,11 +226,6 @@ async function generateCutout(hex: string): Promise<AirframeMedia> {
   ) {
     return media ?? (await upsert(hex, { cutout_state: "none" }));
   }
-  // count the attempt up front so a crashing runtime cannot loop forever
-  await db().execute({
-    sql: "UPDATE airframe_media SET cutout_attempts = cutout_attempts + 1 WHERE hex = ?",
-    args: [hex],
-  });
   const bytes = await getBlobBytes(
     media.photoKey ? { key: media.photoKey, url: media.photoUrl } : null,
   );
@@ -238,6 +233,12 @@ async function generateCutout(hex: string): Promise<AirframeMedia> {
 
   try {
     const { removeBackground } = await import("@imgly/background-removal-node");
+    // Counted only once the runtime has actually loaded, so an environment
+    // without it never burns the budget for one that has it.
+    await db().execute({
+      sql: "UPDATE airframe_media SET cutout_attempts = cutout_attempts + 1 WHERE hex = ?",
+      args: [hex],
+    });
     const cut = await removeBackground(
       new Blob([new Uint8Array(bytes)], { type: "image/jpeg" }),
       { output: { format: "image/png" } },
