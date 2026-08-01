@@ -226,7 +226,14 @@ export async function getEnrichment(params: {
   // per airframe, and user-chosen photos override everything
   let media = await getMedia(hex);
   if (!media?.photoUrl) {
-    const remote = await photoInfo(hex, params.registration ?? null);
+    // The radar feed does not always carry the registration on the poll that
+    // features an aircraft, and without it only the hex lookup runs — which is
+    // why airframes that plainly have photos ended up with none. adsbdb knows
+    // the registration independently, so fall back to that.
+    const remote = await photoInfo(
+      hex,
+      params.registration ?? info.registration ?? null,
+    );
     if (remote) {
       media =
         (await setPhotoFromUrl(hex, remote.url, {
