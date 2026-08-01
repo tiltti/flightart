@@ -95,7 +95,10 @@ export async function recordAircraft(list: Aircraft[]): Promise<void> {
     }
     pending.set(a.hex, { minDistanceKm, maxAltFt, lastWrite: now });
 
-    const args = {
+    // Turso rejects named arguments a statement does not reference, so each
+    // statement gets exactly its own set (a local file database tolerates extras,
+    // which is why this only ever failed in production).
+    const shared = {
       hex: a.hex,
       cutoff,
       now,
@@ -105,8 +108,6 @@ export async function recordAircraft(list: Aircraft[]): Promise<void> {
       registration: a.registration,
       type_code: a.typeCode,
       type_name: a.typeDesc,
-      id: `${a.hex}-${now}`,
-      source: "adsb.fi",
     };
     // extend the open sighting, if there is one
     statements.push({
@@ -122,7 +123,7 @@ export async function recordAircraft(list: Aircraft[]): Promise<void> {
             WHERE id = (SELECT id FROM sightings
                          WHERE hex = :hex AND last_seen >= :cutoff
                          ORDER BY last_seen DESC LIMIT 1)`,
-      args,
+      args: shared,
     });
     // otherwise open a new one — the guard makes concurrent writers safe
     statements.push({
@@ -133,7 +134,7 @@ export async function recordAircraft(list: Aircraft[]): Promise<void> {
                    :now, :now, :dist, :alt, 0, :source
              WHERE NOT EXISTS (SELECT 1 FROM sightings
                                 WHERE hex = :hex AND last_seen >= :cutoff)`,
-      args,
+      args: { ...shared, id: `${a.hex}-${now}`, source: "adsb.fi" },
     });
   }
 
