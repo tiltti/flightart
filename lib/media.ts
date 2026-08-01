@@ -24,6 +24,13 @@ export interface AirframeMedia {
 // background removal is best-effort; stop retrying a photo that keeps failing
 const MAX_CUTOUT_ATTEMPTS = 3;
 
+// The background-removal runtime (onnxruntime + model weights, ~290 MB) is not
+// deployed to Vercel. Cutouts are produced wherever this runs with the native
+// runtime available — in practice the local machine — and land in the same
+// database and blob store, so the deployed display picks them up immediately.
+export const cutoutsEnabled =
+  process.env.ENABLE_CUTOUTS === "1" || !process.env.VERCEL;
+
 interface MediaRow {
   hex: string;
   photo_url: string | null;
@@ -198,6 +205,10 @@ const jobs = (g.__faCutoutJobs ??= new Map());
 // Generates the poster cutout if the airframe has a photo and no verdict yet.
 // Safe to call repeatedly: rejected airframes are never retried automatically.
 export function ensureCutout(hex: string): Promise<AirframeMedia> {
+  if (!cutoutsEnabled) {
+    // leave the state at 'none' so a run with the runtime available picks it up
+    return getMedia(hex).then((m) => m ?? upsert(hex, { cutout_state: "none" }));
+  }
   let job = jobs.get(hex);
   if (!job) {
     job = generateCutout(hex).finally(() => jobs.delete(hex));

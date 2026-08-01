@@ -2,13 +2,11 @@ import { promises as fs } from "fs";
 import path from "path";
 import { USER_AGENT } from "@/lib/config";
 import { db, ready } from "@/lib/db";
-import { getMedia, setPhotoFromBytes } from "@/lib/media";
+import { cutoutsEnabled, ensureCutout, getMedia, setPhotoFromBytes } from "@/lib/media";
 import { isRemoteBlob, putBlob } from "@/lib/blobstore";
 import type { SightingRecord } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-// the platform cap; the import only ever runs locally, where it is not applied
-export const maxDuration = 300;
 
 // One-shot import of the old file-based logbook into the database. Reads files
 // that only exist on the machine that collected them, so it is inert once
@@ -52,6 +50,26 @@ export async function POST(req: Request) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
   await ready();
+
+  // ?cutouts=1 — generate every missing poster cutout. Only does anything where
+  // the background-removal runtime exists, i.e. not on the serverless deployment.
+  if (new URL(req.url).searchParams.has("cutouts")) {
+    if (!cutoutsEnabled) {
+      return Response.json({ error: "background removal not available here" }, { status: 501 });
+    }
+    const pendingRows = await db().execute(
+      "SELECT hex FROM airframe_media WHERE photo_key IS NOT NULL AND cutout_state = 'none' AND cutout_attempts < 3",
+    );
+    const hexes = (pendingRows.rows as unknown as { hex: string }[]).map((r) => r.hex);
+    let ok = 0;
+    let rejected = 0;
+    for (const h of hexes) {
+      const m = await ensureCutout(h);
+      if (m.cutoutState === "ok") ok++;
+      else if (m.cutoutState === "rejected") rejected++;
+    }
+    return Response.json({ considered: hexes.length, generated: ok, rejected });
+  }
 
   const report: Report = {
     sightings: { read: 0, inserted: 0 },

@@ -1,16 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // native onnx runtime must stay unbundled
+  // Background removal is a 290 MB native dependency used for a few seconds of
+  // CPU work, so it is deliberately not shipped to the serverless deployment —
+  // see CUTOUTS in README. Keeping it external stops it being bundled at all.
   serverExternalPackages: ["@imgly/background-removal-node", "onnxruntime-node"],
-  // ...and its linux shared libraries plus the model weights are not reachable
-  // by static analysis, so they have to be traced in explicitly
-  outputFileTracingIncludes: {
-    "/api/**": [
-      "./node_modules/onnxruntime-node/bin/napi-v3/linux/x64/**",
-      "./node_modules/@imgly/background-removal-node/dist/**",
-    ],
-  },
   // no dev badge on the wall display
   devIndicators: false,
 };

@@ -10,7 +10,6 @@ import {
 import { sightingsForHex } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
 
 const MAX_BYTES = 15 * 1024 * 1024;
 
