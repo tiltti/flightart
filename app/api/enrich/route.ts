@@ -17,6 +17,8 @@ export async function GET(req: Request) {
   const lat = num("lat");
   const lon = num("lon");
   const nm = num("nm");
+  const brg = num("brg");
+  const dist = num("dist");
   const enrichment = await getEnrichment({
     hex,
     callsign: p.get("callsign"),
@@ -24,6 +26,8 @@ export async function GET(req: Request) {
     homeLat: lat !== undefined && Math.abs(lat) <= 90 ? lat : undefined,
     homeLon: lon !== undefined && Math.abs(lon) <= 180 ? lon : undefined,
     radiusKm: nm !== undefined && nm > 0 ? nm * 1.852 : undefined,
+    bearingDeg: brg !== undefined && dist !== undefined ? brg : undefined,
+    distanceKm: brg !== undefined && dist !== undefined && dist >= 0 ? dist : undefined,
   });
   return Response.json(enrichment);
 }

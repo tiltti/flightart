@@ -1,35 +1,47 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { PhotoInfo } from "@/lib/types";
 
-// Photographs of the airframe laid out like dropped prints: the primary one
-// square on top, the others tilted behind it. Each card carries its own
-// photographer credit along the bottom of its frame — the back cards are
-// fanned downward so those credits stay visible rather than hiding under
-// the primary card.
-const TILTS = [
-  { rotate: -4, x: -11, y: 7 },
-  { rotate: 5, x: 10, y: 13 },
+// Photographs of the airframe laid out like a hand of cards: one square in the
+// centre on top, the others fanned out either side so every photo is visible.
+// The photos take turns in the centre, shuffling to the next seat every few
+// seconds. Each card carries its own photographer credit along the bottom of
+// its frame, aligned into the strip that card actually shows.
+
+const SHUFFLE_MS = 5000;
+const OPEN_MS = 900;
+
+// seat 0 is the centre; the rest fan outwards, alternating side
+const SEATS = [
+  { x: 0, y: 0, rotate: 0, scale: 1, z: 3, align: "left" as const },
+  { x: -30, y: 5, rotate: -7, scale: 0.86, z: 2, align: "left" as const },
+  { x: 30, y: 9, rotate: 7, scale: 0.86, z: 1, align: "right" as const },
 ];
 
 function Card({
   photo,
-  primary,
-  tilt,
+  seat,
+  opened,
 }: {
   photo: PhotoInfo;
-  primary: boolean;
-  tilt?: { rotate: number; x: number; y: number };
+  seat: (typeof SEATS)[number];
+  opened: boolean;
 }) {
+  const centre = seat.z === 3;
+  // before the fan opens, every card sits squarely under the centre one
+  const t = opened
+    ? `translate(${seat.x}%, ${seat.y}%) rotate(${seat.rotate}deg) scale(${seat.scale})`
+    : "translate(0%, 0%) rotate(0deg) scale(0.9)";
   return (
     <figure
       className="border border-line bg-panel/80 p-2 backdrop-blur-sm [grid-area:1/1]"
       style={{
-        width: primary ? "100%" : "88%",
         justifySelf: "center",
-        zIndex: primary ? 3 : 1,
-        transform: `translate(${tilt?.x ?? 0}%, ${tilt?.y ?? 0}%) rotate(${tilt?.rotate ?? 0}deg)`,
-        boxShadow: primary
+        zIndex: seat.z,
+        transform: t,
+        transition: `transform ${OPEN_MS}ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow ${OPEN_MS}ms ease`,
+        boxShadow: centre
           ? "0 26px 60px rgba(0,0,0,0.65)"
           : "0 14px 36px rgba(0,0,0,0.55)",
       }}
@@ -40,22 +52,18 @@ function Card({
         alt=""
         className="block w-full"
         style={{
-          filter: primary
+          filter: centre
             ? "grayscale(0.15) saturate(0.85) contrast(1.05) brightness(0.96)"
-            : "grayscale(0.4) saturate(0.65) contrast(1.02) brightness(0.62)",
+            : "grayscale(0.4) saturate(0.65) contrast(1.02) brightness(0.66)",
+          transition: "filter 600ms ease",
         }}
       />
       {photo.photographer && (
         <figcaption
-          className="truncate px-[2px] pt-1.5 font-mono text-[9px] uppercase tracking-[0.2em] text-faint"
-          style={{
-            opacity: primary ? 1 : 0.8,
-            // a back card is only visible on the side it is offset towards,
-            // so its credit is aligned into that strip rather than hidden
-            textAlign: primary ? "left" : (tilt?.x ?? 0) < 0 ? "left" : "right",
-          }}
+          className="truncate px-[2px] pt-1.5 font-mono text-[8px] uppercase tracking-[0.2em] text-faint"
+          style={{ opacity: centre ? 1 : 0.8, textAlign: seat.align }}
         >
-          {photo.photographer}
+          Photo by {photo.photographer}
         </figcaption>
       )}
     </figure>
@@ -63,24 +71,52 @@ function Card({
 }
 
 export default function PhotoStack({ photos }: { photos: PhotoInfo[] }) {
-  const [primary, ...rest] = photos;
-  if (!primary) return null;
-  const back = rest.slice(0, 2);
+  const deck = photos.slice(0, SEATS.length);
+  const [opened, setOpened] = useState(false);
+  const [turn, setTurn] = useState(0);
+
+  useEffect(() => {
+    setOpened(false);
+    setTurn(0);
+    const open = setTimeout(() => setOpened(true), 700);
+    return () => clearTimeout(open);
+  }, [photos.map((p) => p.url).join("|")]);
+
+  useEffect(() => {
+    if (deck.length < 2) return;
+    const id = setInterval(() => setTurn((n) => n + 1), SHUFFLE_MS);
+    return () => clearInterval(id);
+  }, [deck.length]);
+
+  if (deck.length === 0) return null;
+
+  // a lone photo keeps the plain framed look
+  if (deck.length === 1) {
+    return (
+      <div
+        className="grid animate-[fa-rise_1.6s_ease_both]"
+        style={{ width: "min(46vw, 640px)" }}
+      >
+        <Card photo={deck[0]} seat={SEATS[0]} opened />
+      </div>
+    );
+  }
 
   return (
     <div
       // the grid stacks every card in one cell; the padding leaves room for the
-      // tilt and the downward fan so nothing is clipped by the spotlight edge
+      // fan so nothing is clipped by the edge of the spotlight
       className="grid animate-[fa-rise_1.6s_ease_both]"
-      style={{
-        width: back.length ? "min(40vw, 560px)" : "min(46vw, 640px)",
-        padding: back.length ? "2% 6% 12% 6%" : "0",
-      }}
+      style={{ width: "min(56vw, 780px)", padding: "1% 17% 9% 17%" }}
     >
-      {back.map((p, i) => (
-        <Card key={p.url} photo={p} primary={false} tilt={TILTS[i]} />
+      {deck.map((p, i) => (
+        <Card
+          key={p.url}
+          photo={p}
+          seat={SEATS[(i + turn) % deck.length]}
+          opened={opened}
+        />
       ))}
-      <Card photo={primary} primary />
     </div>
   );
 }

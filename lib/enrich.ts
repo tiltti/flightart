@@ -1,7 +1,12 @@
 import { after } from "next/server";
 import { airportCoords } from "@/lib/airfields";
 import { HOME, RADIUS_NM, USER_AGENT } from "@/lib/config";
-import { bearingDeg, distanceKm, greatCirclePoints } from "@/lib/geo";
+import {
+  bearingDeg,
+  destinationPoint,
+  distanceKm,
+  greatCirclePoints,
+} from "@/lib/geo";
 import type { AirfieldMarker } from "@/lib/types";
 import {
   collectStackPhotos,
@@ -167,18 +172,31 @@ async function photoInfo(
   return photo;
 }
 
-// The part of the origin→destination great circle that crosses the radar,
-// expressed the same way aircraft are: bearing and distance from home.
+// The flown route as far as it crosses the radar, expressed the way aircraft
+// are: bearing and distance from home. Drawn as two legs through the aircraft's
+// current position rather than one direct great circle, because airliners
+// follow airways — a direct line would leave the aircraft sitting beside its
+// own route.
 function routeTrackFor(
   route: RouteInfo | null,
   home: { lat: number; lon: number },
   radiusKm: number,
+  aircraft?: { lat: number; lon: number },
 ): AirfieldMarker[] {
   const from = airportCoords(route?.originIata);
   const to = airportCoords(route?.destIata);
   if (!from || !to) return [];
+
+  const legs = aircraft
+    ? [
+        greatCirclePoints(from.lat, from.lon, aircraft.lat, aircraft.lon, 200),
+        greatCirclePoints(aircraft.lat, aircraft.lon, to.lat, to.lon, 200),
+      ]
+    : [greatCirclePoints(from.lat, from.lon, to.lat, to.lon, 400)];
+
   const keep = radiusKm * 1.15;
-  return greatCirclePoints(from.lat, from.lon, to.lat, to.lon, 400)
+  return legs
+    .flat()
     .map((p) => ({
       code: "",
       distanceKm: distanceKm(home.lat, home.lon, p.lat, p.lon),
@@ -194,6 +212,9 @@ export async function getEnrichment(params: {
   homeLat?: number;
   homeLon?: number;
   radiusKm?: number;
+  // where the aircraft is right now, as reported on the radar
+  bearingDeg?: number;
+  distanceKm?: number;
 }): Promise<Enrichment> {
   const hex = params.hex.toLowerCase();
   const [info, route] = await Promise.all([
@@ -263,13 +284,16 @@ export async function getEnrichment(params: {
     photo: servedPhoto,
     photos,
     cutoutUrl,
-    routeTrack: routeTrackFor(
-      route,
-      {
+    routeTrack: (() => {
+      const home = {
         lat: params.homeLat ?? HOME.lat,
         lon: params.homeLon ?? HOME.lon,
-      },
-      params.radiusKm ?? RADIUS_NM * 1.852,
-    ),
+      };
+      const here =
+        params.bearingDeg !== undefined && params.distanceKm !== undefined
+          ? destinationPoint(home.lat, home.lon, params.bearingDeg, params.distanceKm)
+          : undefined;
+      return routeTrackFor(route, home, params.radiusKm ?? RADIUS_NM * 1.852, here);
+    })(),
   };
 }

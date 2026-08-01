@@ -116,7 +116,12 @@ export default function Home() {
     selectedLastSeen.current = Date.now();
     featuredAt.current.set(a.hex, Date.now());
     try {
-      const q = new URLSearchParams({ hex: a.hex, nm: String(settingsRef.current.radarNm) });
+      const q = new URLSearchParams({
+        hex: a.hex,
+        nm: String(settingsRef.current.radarNm),
+        brg: a.bearingDeg.toFixed(3),
+        dist: a.distanceKm.toFixed(3),
+      });
       if (a.callsign) q.set("callsign", a.callsign);
       if (a.registration) q.set("reg", a.registration);
       if (settingsRef.current.homeLat != null && settingsRef.current.homeLon != null) {

@@ -54,6 +54,30 @@ export function greatCirclePoints(
   return out;
 }
 
+// Inverse of bearing/distance: where a point actually is, given how it was
+// reported relative to home.
+export function destinationPoint(
+  lat: number,
+  lon: number,
+  bearing: number,
+  distKm: number,
+): { lat: number; lon: number } {
+  const δ = distKm / R_KM;
+  const θ = rad(bearing);
+  const φ1 = rad(lat);
+  const λ1 = rad(lon);
+  const φ2 = Math.asin(
+    Math.sin(φ1) * Math.cos(δ) + Math.cos(φ1) * Math.sin(δ) * Math.cos(θ),
+  );
+  const λ2 =
+    λ1 +
+    Math.atan2(
+      Math.sin(θ) * Math.sin(δ) * Math.cos(φ1),
+      Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2),
+    );
+  return { lat: (φ2 * 180) / Math.PI, lon: (λ2 * 180) / Math.PI };
+}
+
 export function coordsLabel(lat: number, lon: number): string {
   const part = (v: number, pos: string, neg: string) => {
     const abs = Math.abs(v);

@@ -206,18 +206,17 @@ export default function Radar({
           .map((f) => {
             const p = toXY(f.bearingDeg, f.distanceKm, radiusKm);
             return (
-              <g key={f.code} transform={`translate(${p.x} ${p.y})`}>
+              <g
+                key={f.code}
+                transform={`translate(${p.x} ${p.y})`}
+                opacity="0.8"
+              >
                 <path
                   d="M-1.6,0 L0,-1.6 L1.6,0 L0,1.6 Z"
-                  className="fill-none stroke-faint"
-                  strokeWidth="0.4"
+                  className="fill-none stroke-field"
+                  strokeWidth="0.45"
                 />
-                <text
-                  x="2.6"
-                  y="1"
-                  fontSize="3.2"
-                  className="fill-faint font-mono"
-                >
+                <text x="2.6" y="1" fontSize="3.2" className="fill-field font-mono">
                   {f.code}
                 </text>
               </g>

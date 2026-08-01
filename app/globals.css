@@ -8,6 +8,8 @@
   --color-faint: #55616c;
   --color-line: rgba(232, 237, 242, 0.08);
   --color-accent: #d9a05b;
+  /* airfields read as a cool, lighter tint against the warm accent */
+  --color-field: #9dc4dd;
 }
 
 @theme inline {
