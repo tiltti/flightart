@@ -1,4 +1,5 @@
-import { AIRFIELDS, HOME, RADIUS_NM, USER_AGENT } from "@/lib/config";
+import { airfieldsNear } from "@/lib/airfields";
+import { HOME, RADIUS_NM, USER_AGENT } from "@/lib/config";
 import { bearingDeg, distanceKm } from "@/lib/geo";
 import type { Aircraft, AirfieldMarker } from "@/lib/types";
 
@@ -67,10 +68,9 @@ export async function fetchNearby(
     .sort((a, b) => a.distanceKm - b.distanceKm);
 }
 
-export function airfieldMarkers(home: HomePoint = HOME): AirfieldMarker[] {
-  return AIRFIELDS.map((f) => ({
-    code: f.code,
-    distanceKm: distanceKm(home.lat, home.lon, f.lat, f.lon),
-    bearingDeg: bearingDeg(home.lat, home.lon, f.lat, f.lon),
-  }));
+export function airfieldMarkers(
+  home: HomePoint = HOME,
+  radiusKm = RADIUS_NM * 1.852,
+): AirfieldMarker[] {
+  return airfieldsNear(home.lat, home.lon, radiusKm);
 }

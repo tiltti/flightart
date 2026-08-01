@@ -67,6 +67,10 @@ export default function Home() {
     settings.radarNm,
   );
 
+  // read inside callbacks without making them depend on every settings change
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
   const featuredAt = useRef(new Map<string, number>());
   const selectedHexRef = useRef<string | null>(null);
   const selectedSince = useRef(0);
@@ -112,9 +116,13 @@ export default function Home() {
     selectedLastSeen.current = Date.now();
     featuredAt.current.set(a.hex, Date.now());
     try {
-      const q = new URLSearchParams({ hex: a.hex });
+      const q = new URLSearchParams({ hex: a.hex, nm: String(settingsRef.current.radarNm) });
       if (a.callsign) q.set("callsign", a.callsign);
       if (a.registration) q.set("reg", a.registration);
+      if (settingsRef.current.homeLat != null && settingsRef.current.homeLon != null) {
+        q.set("lat", String(settingsRef.current.homeLat));
+        q.set("lon", String(settingsRef.current.homeLon));
+      }
       const res = await fetch(`/api/enrich?${q}`);
       const e = (await res.json()) as Enrichment;
       if (selectedHexRef.current !== a.hex) return;
@@ -253,7 +261,8 @@ export default function Home() {
         <Radar
           key={`${settings.homeLat}:${settings.homeLon}:${settings.radarNm}`}
           aircraft={data?.aircraft ?? []}
-          airfields={data?.airfields ?? []}
+          airfields={settings.showAirfields ? (data?.airfields ?? []) : []}
+          routeTrack={settings.showRouteTrack ? enrichment?.routeTrack : null}
           radiusKm={data?.radiusKm ?? settings.radarNm * 1.852}
           selectedHex={selected?.hex ?? null}
           queuedHexes={queue}

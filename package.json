@@ -12,6 +12,7 @@
     "@imgly/background-removal-node": "^1.4.5",
     "@libsql/client": "^0.17.4",
     "@vercel/blob": "^2.6.1",
+    "airport-data": "^1.0.1",
     "leaflet": "^1.9.4",
     "next": "16.2.12",
     "react": "19.2.4",

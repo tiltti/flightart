@@ -62,7 +62,7 @@ export async function GET(req: Request) {
       home: name,
       homeCoords: coordsLabel(home.lat, home.lon),
       radiusKm: nm * 1.852,
-      airfields: airfieldMarkers(home),
+      airfields: airfieldMarkers(home, nm * 1.852),
       aircraft,
     };
     cache.set(key, { at: Date.now(), payload });
@@ -74,7 +74,7 @@ export async function GET(req: Request) {
       home: name,
       homeCoords: coordsLabel(home.lat, home.lon),
       radiusKm: nm * 1.852,
-      airfields: airfieldMarkers(home),
+      airfields: airfieldMarkers(home, nm * 1.852),
       aircraft: [],
       error: "unavailable",
     };

@@ -15,6 +15,45 @@ export function distanceKm(
   return 2 * R_KM * Math.asin(Math.sqrt(a));
 }
 
+// Points along the great circle between two coordinates, which is the track an
+// airliner actually flies — a straight line on a flat projection is not.
+export function greatCirclePoints(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+  steps: number,
+): { lat: number; lon: number }[] {
+  const φ1 = rad(lat1);
+  const λ1 = rad(lon1);
+  const φ2 = rad(lat2);
+  const λ2 = rad(lon2);
+  const δ =
+    2 *
+    Math.asin(
+      Math.sqrt(
+        Math.sin((φ2 - φ1) / 2) ** 2 +
+          Math.cos(φ1) * Math.cos(φ2) * Math.sin((λ2 - λ1) / 2) ** 2,
+      ),
+    );
+  if (δ === 0) return [{ lat: lat1, lon: lon1 }];
+
+  const out: { lat: number; lon: number }[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const f = i / steps;
+    const a = Math.sin((1 - f) * δ) / Math.sin(δ);
+    const b = Math.sin(f * δ) / Math.sin(δ);
+    const x = a * Math.cos(φ1) * Math.cos(λ1) + b * Math.cos(φ2) * Math.cos(λ2);
+    const y = a * Math.cos(φ1) * Math.sin(λ1) + b * Math.cos(φ2) * Math.sin(λ2);
+    const z = a * Math.sin(φ1) + b * Math.sin(φ2);
+    out.push({
+      lat: (Math.atan2(z, Math.sqrt(x * x + y * y)) * 180) / Math.PI,
+      lon: (Math.atan2(y, x) * 180) / Math.PI,
+    });
+  }
+  return out;
+}
+
 export function coordsLabel(lat: number, lon: number): string {
   const part = (v: number, pos: string, neg: string) => {
     const abs = Math.abs(v);

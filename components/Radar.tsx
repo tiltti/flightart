@@ -20,6 +20,7 @@ interface Props {
   selectedHex: string | null;
   queuedHexes?: string[];
   geo?: number[][][] | null;
+  routeTrack?: AirfieldMarker[] | null;
   onSelect?: (hex: string) => void;
 }
 
@@ -30,6 +31,7 @@ export default function Radar({
   selectedHex,
   queuedHexes,
   geo,
+  routeTrack,
   onSelect,
 }: Props) {
   const trails = useRef(new Map<string, { x: number; y: number }[]>());
@@ -180,6 +182,22 @@ export default function Radar({
             {c}
           </text>
         ))}
+
+        {routeTrack && routeTrack.length > 1 && (
+          <polyline
+            clipPath="url(#fa-radar-clip)"
+            points={routeTrack
+              .map((p) => {
+                const q = toXY(p.bearingDeg, p.distanceKm, radiusKm);
+                return `${q.x},${q.y}`;
+              })
+              .join(" ")}
+            className="fill-none stroke-accent"
+            strokeWidth="0.4"
+            strokeDasharray="2 2"
+            opacity="0.45"
+          />
+        )}
 
         <circle r="1" className="fill-accent" />
 

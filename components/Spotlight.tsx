@@ -158,7 +158,7 @@ export default function Spotlight({
 
   const photo = enrichment?.photo ?? null;
   const cutout =
-    settings.displayMode !== "dark" ? (enrichment?.cutoutUrl ?? null) : null;
+    settings.displayMode !== "photo" ? (enrichment?.cutoutUrl ?? null) : null;
 
   if (cutout) {
     const field =

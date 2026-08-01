@@ -51,6 +51,8 @@ export interface Enrichment {
   route: RouteInfo | null;
   photo: PhotoInfo | null;
   cutoutUrl: string | null;
+  // the flown route, as far as it reaches across the radar
+  routeTrack: AirfieldMarker[];
 }
 
 export interface SightingRecord {

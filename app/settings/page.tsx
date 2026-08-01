@@ -12,7 +12,7 @@ const BTN =
 const INPUT =
   "border border-line bg-transparent px-3 py-2 font-mono text-xs uppercase tracking-[0.2em] text-ink focus:border-accent/40 focus:outline-none";
 
-const TABS = ["location", "display", "rotation", "data"] as const;
+const TABS = ["location", "display", "radar", "rotation"] as const;
 type Tab = (typeof TABS)[number];
 
 function Row({
@@ -213,12 +213,11 @@ export default function SettingsPage() {
           <section>
             <Row
               label="Spotlight view"
-              hint="auto/poster = poster art when a clean cutout exists · photo = always the photograph"
+              hint="photo = always the photograph · auto/poster = poster art when a clean cutout exists"
             >
               <Segmented
                 value={settings.displayMode}
-                options={["auto", "poster", "dark"] as const}
-                labels={{ dark: "photo" }}
+                options={["photo", "auto", "poster"] as const}
                 onChange={(displayMode: Settings["displayMode"]) =>
                   update({ displayMode })
                 }
@@ -278,7 +277,7 @@ export default function SettingsPage() {
           </section>
         )}
 
-        {tab === "data" && (
+        {tab === "radar" && (
           <section className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_300px]">
             <div>
               <Row label="Radar range" hint="1 NM = 1.852 km">
@@ -299,6 +298,23 @@ export default function SettingsPage() {
                   value={settings.showMap ? "on" : "off"}
                   options={["off", "on"] as const}
                   onChange={(v) => update({ showMap: v === "on" })}
+                />
+              </Row>
+              <Row label="Airfields" hint="airports within range, by ICAO code">
+                <Segmented
+                  value={settings.showAirfields ? "on" : "off"}
+                  options={["off", "on"] as const}
+                  onChange={(v) => update({ showAirfields: v === "on" })}
+                />
+              </Row>
+              <Row
+                label="Route track"
+                hint="the featured flight's great circle across the radar"
+              >
+                <Segmented
+                  value={settings.showRouteTrack ? "on" : "off"}
+                  options={["off", "on"] as const}
+                  onChange={(v) => update({ showRouteTrack: v === "on" })}
                 />
               </Row>
               <Row label="Radar poll" hint="adsb.fi asks for max ~1 req/s">

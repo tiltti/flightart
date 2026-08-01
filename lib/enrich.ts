@@ -1,5 +1,8 @@
 import { after } from "next/server";
-import { USER_AGENT } from "@/lib/config";
+import { airportCoords } from "@/lib/airfields";
+import { HOME, RADIUS_NM, USER_AGENT } from "@/lib/config";
+import { bearingDeg, distanceKm, greatCirclePoints } from "@/lib/geo";
+import type { AirfieldMarker } from "@/lib/types";
 import { ensureCutout, getMedia, setPhotoFromUrl } from "@/lib/media";
 import type { Enrichment, PhotoInfo, RouteInfo } from "@/lib/types";
 
@@ -157,10 +160,33 @@ async function photoInfo(
   return photo;
 }
 
+// The part of the origin→destination great circle that crosses the radar,
+// expressed the same way aircraft are: bearing and distance from home.
+function routeTrackFor(
+  route: RouteInfo | null,
+  home: { lat: number; lon: number },
+  radiusKm: number,
+): AirfieldMarker[] {
+  const from = airportCoords(route?.originIata);
+  const to = airportCoords(route?.destIata);
+  if (!from || !to) return [];
+  const keep = radiusKm * 1.15;
+  return greatCirclePoints(from.lat, from.lon, to.lat, to.lon, 400)
+    .map((p) => ({
+      code: "",
+      distanceKm: distanceKm(home.lat, home.lon, p.lat, p.lon),
+      bearingDeg: bearingDeg(home.lat, home.lon, p.lat, p.lon),
+    }))
+    .filter((p) => p.distanceKm <= keep);
+}
+
 export async function getEnrichment(params: {
   hex: string;
   callsign?: string | null;
   registration?: string | null;
+  homeLat?: number;
+  homeLon?: number;
+  radiusKm?: number;
 }): Promise<Enrichment> {
   const hex = params.hex.toLowerCase();
   const [info, route] = await Promise.all([
@@ -208,5 +234,13 @@ export async function getEnrichment(params: {
     route,
     photo: servedPhoto,
     cutoutUrl,
+    routeTrack: routeTrackFor(
+      route,
+      {
+        lat: params.homeLat ?? HOME.lat,
+        lon: params.homeLon ?? HOME.lon,
+      },
+      params.radiusKm ?? RADIUS_NM * 1.852,
+    ),
   };
 }
