@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface Line {
   label: string;
@@ -34,11 +34,15 @@ export default function CinematicText({
     Math.max(0, ...lines.map((l) => l.value.length)) * charMs +
     1500;
 
+  // Lines are appended as enrichment arrives, which moves the finish line. The
+  // clock origin stays put so already-revealed text is never replayed.
+  const originRef = useRef<number | null>(null);
+  originRef.current ??= performance.now();
+
   useEffect(() => {
-    setT(0);
-    const startedAt = performance.now();
+    const origin = originRef.current!;
     const id = setInterval(() => {
-      const elapsed = performance.now() - startedAt;
+      const elapsed = performance.now() - origin;
       setT(elapsed);
       if (elapsed > totalMs) clearInterval(id);
     }, 50);

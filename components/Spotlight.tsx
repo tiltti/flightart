@@ -37,17 +37,22 @@ function LiveField({
   charMs: number;
 }) {
   const [t, setT] = useState(0);
-  // freeze the finish line at mount; later value updates render fully typed
-  const doneAt = useRef(startMs + value.length * charMs + 800);
+  // The clock origin is fixed at mount, but the finish line is not: enrichment
+  // arriving adds text lines, which pushes startMs later. Freezing the finish
+  // line at mount stopped the timer before the animation had even begun.
+  const originRef = useRef<number | null>(null);
+  originRef.current ??= performance.now();
+  const endAt = startMs + value.length * charMs + 800;
+
   useEffect(() => {
-    const start = performance.now();
+    const origin = originRef.current!;
     const id = setInterval(() => {
-      const elapsed = performance.now() - start;
+      const elapsed = performance.now() - origin;
       setT(elapsed);
-      if (elapsed > doneAt.current) clearInterval(id);
+      if (elapsed > endAt) clearInterval(id);
     }, 50);
     return () => clearInterval(id);
-  }, []);
+  }, [endAt]);
 
   const shown = Math.max(0, Math.floor((t - startMs) / charMs));
   const typing = shown > 0 && shown < value.length;
