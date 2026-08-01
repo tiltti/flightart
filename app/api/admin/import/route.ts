@@ -7,7 +7,8 @@ import { isRemoteBlob, putBlob } from "@/lib/blobstore";
 import type { SightingRecord } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 800;
+// the platform cap; the import only ever runs locally, where it is not applied
+export const maxDuration = 300;
 
 // One-shot import of the old file-based logbook into the database. Reads files
 // that only exist on the machine that collected them, so it is inert once
