@@ -263,6 +263,99 @@ async function generateCutout(hex: string): Promise<AirframeMedia> {
   }
 }
 
+// --- curation: browsing and banning cutouts ---
+
+export interface CutoutEntry {
+  hex: string;
+  registration: string | null;
+  typeCode: string | null;
+  operator: string | null;
+  cutoutUrl: string | null;
+  photoUrl: string | null;
+  photographer: string | null;
+  state: CutoutState;
+  rejectedReason: string | null;
+  timesSeen: number;
+  lastSeen: number;
+}
+
+export interface CutoutPage {
+  rows: CutoutEntry[];
+  total: number;
+  page: number;
+  per: number;
+}
+
+// Ordered by how often the airframe has been seen, so the ones that take up
+// the most wall time are curated first.
+export async function listCutouts(opts: {
+  filter?: "kept" | "banned" | "all";
+  page?: number;
+  per?: number;
+}): Promise<CutoutPage> {
+  await ready();
+  const where =
+    opts.filter === "banned"
+      ? "m.cutout_state = 'rejected'"
+      : opts.filter === "all"
+        ? "(m.cutout_state = 'ok' OR m.cutout_state = 'rejected')"
+        : "m.cutout_state = 'ok'";
+
+  const per = Math.min(60, Math.max(6, opts.per ?? 24));
+  const countRes = await db().execute(
+    `SELECT count(*) AS n FROM airframe_media m WHERE ${where}`,
+  );
+  const total = Number((countRes.rows[0] as unknown as { n: number }).n);
+  const pageCount = Math.max(1, Math.ceil(total / per));
+  const page = Math.min(pageCount, Math.max(1, opts.page ?? 1));
+
+  const res = await db().execute({
+    sql: `SELECT m.hex, m.cutout_url, m.photo_url, m.photographer,
+                 m.cutout_state, m.rejected_reason,
+                 count(s.id) AS times_seen,
+                 max(s.last_seen) AS last_seen,
+                 max(s.registration) AS registration,
+                 max(s.type_code) AS type_code,
+                 max(s.operator) AS operator
+            FROM airframe_media m
+            LEFT JOIN sightings s ON s.hex = m.hex
+           WHERE ${where}
+           GROUP BY m.hex
+           ORDER BY times_seen DESC, last_seen DESC
+           LIMIT :limit OFFSET :offset`,
+    args: { limit: per, offset: (page - 1) * per },
+  });
+
+  const rows = (
+    res.rows as unknown as {
+      hex: string;
+      cutout_url: string | null;
+      photo_url: string | null;
+      photographer: string | null;
+      cutout_state: string;
+      rejected_reason: string | null;
+      times_seen: number;
+      last_seen: number | null;
+      registration: string | null;
+      type_code: string | null;
+      operator: string | null;
+    }[]
+  ).map((r) => ({
+    hex: r.hex,
+    registration: r.registration,
+    typeCode: r.type_code,
+    operator: r.operator,
+    cutoutUrl: r.cutout_url,
+    photoUrl: r.photo_url,
+    photographer: r.photographer,
+    state: r.cutout_state as CutoutState,
+    rejectedReason: r.rejected_reason,
+    timesSeen: Number(r.times_seen ?? 0),
+    lastSeen: Number(r.last_seen ?? 0),
+  }));
+  return { rows, total, page, per };
+}
+
 // --- extra gallery photos for the spotlight stack ---
 
 export interface StackPhoto {

@@ -309,6 +309,12 @@ export default function Home() {
             log
           </Link>
           <Link
+            href="/admin"
+            className="text-faint transition-colors hover:text-accent"
+          >
+            adm
+          </Link>
+          <Link
             href="/settings"
             className="text-faint transition-colors hover:text-accent"
           >
