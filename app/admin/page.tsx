@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { adminHeaders, getAdminSecret, setAdminSecret } from "@/lib/adminSecret";
 import type { CutoutEntry, CutoutPage } from "@/lib/media";
 
 const TABS = ["cutouts"] as const;
@@ -105,6 +106,12 @@ export default function AdminPage() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<CutoutPage | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [secret, setSecret] = useState("");
+  const [needsSecret, setNeedsSecret] = useState(false);
+
+  useEffect(() => {
+    setSecret(getAdminSecret());
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -124,11 +131,16 @@ export default function AdminPage() {
   const act = async (hex: string, mode: "photo-only" | "auto") => {
     setBusy(hex);
     try {
-      await fetch(`/api/plane/${hex}`, {
+      const res = await fetch(`/api/plane/${hex}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: adminHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ mode }),
       });
+      if (res.status === 401) {
+        setNeedsSecret(true);
+        return;
+      }
+      setNeedsSecret(false);
       await load();
     } finally {
       setBusy(null);
@@ -162,6 +174,36 @@ export default function AdminPage() {
             </button>
           ))}
         </nav>
+
+        {needsSecret && (
+          <div className="mb-6 border border-accent/40 bg-accent/5 p-5">
+            <div className="font-mono text-[11px] uppercase tracking-[0.3em] text-accent">
+              Curation is locked
+            </div>
+            <p className="mt-2 max-w-xl font-mono text-[10px] leading-relaxed tracking-[0.1em] text-faint">
+              This deployment only accepts changes with the admin secret. Enter
+              it once and it stays in this browser.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <input
+                type="password"
+                value={secret}
+                placeholder="ADMIN SECRET"
+                onChange={(e) => setSecret(e.target.value)}
+                className="w-72 border border-line bg-transparent px-3 py-2 font-mono text-xs tracking-[0.2em] text-ink placeholder:text-faint focus:border-accent/40 focus:outline-none"
+              />
+              <button
+                onClick={() => {
+                  setAdminSecret(secret.trim());
+                  setNeedsSecret(false);
+                }}
+                className={BTN}
+              >
+                Unlock
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div className="flex border border-line">

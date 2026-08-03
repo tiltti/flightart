@@ -7,10 +7,12 @@ import "leaflet/dist/leaflet.css";
 interface Props {
   lat: number;
   lon: number;
+  // false while no home point has been chosen: show the world, not a marker
+  placed?: boolean;
   onPick: (lat: number, lon: number) => void;
 }
 
-export default function MapPicker({ lat, lon, onPick }: Props) {
+export default function MapPicker({ lat, lon, placed = true, onPick }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
@@ -22,7 +24,7 @@ export default function MapPicker({ lat, lon, onPick }: Props) {
     (async () => {
       const L = (await import("leaflet")).default;
       if (disposed || !ref.current || mapRef.current) return;
-      const map = L.map(ref.current).setView([lat, lon], 9);
+      const map = L.map(ref.current).setView([lat, lon], placed ? 9 : 2);
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 17,
         attribution: "© OpenStreetMap",

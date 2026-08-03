@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { HOME, RADIUS_NM } from "@/lib/config";
 import { coordsLabel } from "@/lib/geo";
+import { rateLimited, tooMany } from "@/lib/ratelimit";
 import { airfieldMarkers, fetchNearby } from "@/lib/sources/adsbfi";
 import { recordAircraft } from "@/lib/store";
 import type { RadarPayload } from "@/lib/types";
@@ -18,6 +19,8 @@ const cache =
     : (g.__faRadarCache = new Map());
 
 export async function GET(req: Request) {
+  // every call can reach the upstream feed and write to the database
+  if (rateLimited(req, "aircraft", 40, 60_000)) return tooMany(30);
   const p = new URL(req.url).searchParams;
   const nmParam = Number(p.get("nm"));
   const nm = Math.min(

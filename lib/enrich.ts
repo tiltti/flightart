@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { recordSpotlight } from "@/lib/store";
 import { airportCoords } from "@/lib/airfields";
 import { HOME, RADIUS_NM, USER_AGENT } from "@/lib/config";
 import {
@@ -215,6 +216,8 @@ export async function getEnrichment(params: {
   // where the aircraft is right now, as reported on the radar
   bearingDeg?: number;
   distanceKm?: number;
+  // the display is featuring this aircraft, so record it in the logbook
+  spotlight?: boolean;
 }): Promise<Enrichment> {
   const hex = params.hex.toLowerCase();
   const [info, route] = await Promise.all([
@@ -282,7 +285,7 @@ export async function getEnrichment(params: {
       after(() => ensureCutout(hex).catch(() => {}));
     }
   }
-  return {
+  const enrichment: Enrichment = {
     hex,
     registration: params.registration ?? info.registration,
     typeName: info.typeName,
@@ -303,4 +306,15 @@ export async function getEnrichment(params: {
       return routeTrackFor(route, home, params.radiusKm ?? RADIUS_NM * 1.852, here);
     })(),
   };
+
+  // Featuring an aircraft is exactly what enrichment is requested for, so the
+  // logbook is marked here rather than trusting the browser to report it.
+  if (params.spotlight) {
+    after(() =>
+      recordSpotlight(enrichment).catch((err) =>
+        console.error("[flightart] recordSpotlight failed:", err),
+      ),
+    );
+  }
+  return enrichment;
 }

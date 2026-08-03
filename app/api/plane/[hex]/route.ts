@@ -1,4 +1,6 @@
+import { denied, isCurationAllowed } from "@/lib/auth";
 import { findCandidates } from "@/lib/galleries";
+import { rateLimited, tooMany } from "@/lib/ratelimit";
 import {
   ensureCutout,
   getMedia,
@@ -29,6 +31,8 @@ export async function GET(
   const search = new URL(req.url).searchParams;
 
   if (search.has("candidates")) {
+    // this one fans out to two external galleries, so it is limited hardest
+    if (rateLimited(req, "candidates", 20, 60_000)) return tooMany(60);
     return Response.json({
       candidates: await findCandidates(hex, search.get("reg")),
     });
@@ -78,6 +82,9 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ hex: string }> },
 ) {
+  if (!isCurationAllowed(req)) return denied();
+  if (rateLimited(req, "plane-write", 60, 60_000)) return tooMany(60);
+
   const hex = parseHex((await params).hex);
   if (!hex) return Response.json({ error: "bad hex" }, { status: 400 });
   const contentType = req.headers.get("content-type") ?? "";

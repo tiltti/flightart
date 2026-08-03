@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { adminHeaders } from "@/lib/adminSecret";
 import type { SightingRecord } from "@/lib/types";
 
 interface PhotoMeta {
@@ -113,7 +114,7 @@ export default function AircraftPage() {
     try {
       await fetch(`/api/plane/${hex}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: adminHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ url: src, ...meta }),
       });
       await refreshed();
@@ -127,7 +128,11 @@ export default function AircraftPage() {
     try {
       const fd = new FormData();
       fd.set("file", file);
-      await fetch(`/api/plane/${hex}`, { method: "POST", body: fd });
+      await fetch(`/api/plane/${hex}`, {
+        method: "POST",
+        headers: adminHeaders(),
+        body: fd,
+      });
       await refreshed();
     } finally {
       setBusy(null);
@@ -139,7 +144,7 @@ export default function AircraftPage() {
     try {
       await fetch(`/api/plane/${hex}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: adminHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ mode }),
       });
       await refreshed();

@@ -60,10 +60,12 @@ export default function Home() {
   const [idleStats, setIdleStats] = useState<Stats | null>(null);
   const [queue, setQueue] = useState<string[]>([]);
 
+  // no coordinates live in the client: when the home point has not been set
+  // here, the request omits it entirely and the server uses its own
   const geo = useGeoOutline(
     settings.showMap,
-    settings.homeLat ?? 60.25,
-    settings.homeLon ?? 24.065,
+    settings.homeLat,
+    settings.homeLon,
     settings.radarNm,
   );
 
@@ -121,6 +123,7 @@ export default function Home() {
         nm: String(settingsRef.current.radarNm),
         brg: a.bearingDeg.toFixed(3),
         dist: a.distanceKm.toFixed(3),
+        spotlight: "1", // the server records the sighting; the browser cannot
       });
       if (a.callsign) q.set("callsign", a.callsign);
       if (a.registration) q.set("reg", a.registration);
@@ -132,11 +135,6 @@ export default function Home() {
       const e = (await res.json()) as Enrichment;
       if (selectedHexRef.current !== a.hex) return;
       setEnrichment(e);
-      fetch("/api/sightings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(e),
-      }).catch(() => {});
 
       // cutout generation runs in the background — re-check a few times
       if (e.photo && !e.cutoutUrl) {

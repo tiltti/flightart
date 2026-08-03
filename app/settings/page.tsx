@@ -194,9 +194,15 @@ export default function SettingsPage() {
       .catch(() => {});
   }, [tab, sample]);
 
-  const lat = settings.homeLat ?? 60.25;
-  const lon = settings.homeLon ?? 24.065;
-  const previewGeo = useGeoOutline(settings.showMap, lat, lon, settings.radarNm);
+  // only used to centre the map picker before a home point has been chosen
+  const lat = settings.homeLat ?? 0;
+  const lon = settings.homeLon ?? 0;
+  const previewGeo = useGeoOutline(
+    settings.showMap,
+    settings.homeLat,
+    settings.homeLon,
+    settings.radarNm,
+  );
 
   const useBrowserLocation = () => {
     if (!navigator.geolocation) {
@@ -290,6 +296,7 @@ export default function SettingsPage() {
               <MapPicker
                 lat={lat}
                 lon={lon}
+                placed={settings.homeLat != null && settings.homeLon != null}
                 onPick={(la, lo) => update({ homeLat: la, homeLon: lo })}
               />
             </div>

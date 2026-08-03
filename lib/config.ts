@@ -1,7 +1,10 @@
+// The home point comes from the environment; the fallback is a well-known
+// airport rather than anyone's home, so a fresh clone runs without publishing
+// a real location and no coordinates live in the repository.
 export const HOME = {
-  name: process.env.HOME_NAME ?? "LOHJA",
-  lat: Number(process.env.HOME_LAT ?? 60.25),
-  lon: Number(process.env.HOME_LON ?? 24.065),
+  name: process.env.HOME_NAME ?? "EFHK",
+  lat: Number(process.env.HOME_LAT ?? 60.3172),
+  lon: Number(process.env.HOME_LON ?? 24.9633),
 };
 
 // nautical miles; adsb.fi query radius = outer radar ring

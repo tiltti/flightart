@@ -1,9 +1,11 @@
 import { HOME, RADIUS_NM } from "@/lib/config";
 import { outlinePaths } from "@/lib/geooutline";
+import { rateLimited, tooMany } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  if (rateLimited(req, "geo", 30, 60_000)) return tooMany(60);
   const p = new URL(req.url).searchParams;
   const latN = Number(p.get("lat"));
   const lonN = Number(p.get("lon"));
