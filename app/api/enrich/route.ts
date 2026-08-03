@@ -1,4 +1,5 @@
 import { getEnrichment } from "@/lib/enrich";
+import { latParam, lonParam, numParam } from "@/lib/params";
 import { rateLimited, tooMany } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
@@ -8,28 +9,21 @@ export async function GET(req: Request) {
   const p = new URL(req.url).searchParams;
   const hex = p.get("hex");
   if (!hex) return Response.json({ error: "hex required" }, { status: 400 });
-  // Number(null) is 0, not NaN — an absent coordinate must not read as the
-  // equator, so each parameter is checked for presence before conversion.
-  const num = (key: string): number | undefined => {
-    const raw = p.get(key);
-    if (raw === null) return undefined;
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : undefined;
-  };
-  const lat = num("lat");
-  const lon = num("lon");
-  const nm = num("nm");
-  const brg = num("brg");
-  const dist = num("dist");
+
+  const nm = numParam(p, "nm");
+  const brg = numParam(p, "brg");
+  const dist = numParam(p, "dist");
+  const hasPosition = brg !== undefined && dist !== undefined && dist >= 0;
+
   const enrichment = await getEnrichment({
     hex,
     callsign: p.get("callsign"),
     registration: p.get("reg"),
-    homeLat: lat !== undefined && Math.abs(lat) <= 90 ? lat : undefined,
-    homeLon: lon !== undefined && Math.abs(lon) <= 180 ? lon : undefined,
+    homeLat: latParam(p),
+    homeLon: lonParam(p),
     radiusKm: nm !== undefined && nm > 0 ? nm * 1.852 : undefined,
-    bearingDeg: brg !== undefined && dist !== undefined ? brg : undefined,
-    distanceKm: brg !== undefined && dist !== undefined && dist >= 0 ? dist : undefined,
+    bearingDeg: hasPosition ? brg : undefined,
+    distanceKm: hasPosition ? dist : undefined,
     spotlight: p.get("spotlight") === "1",
   });
   return Response.json(enrichment);

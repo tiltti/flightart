@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { HOME, RADIUS_NM } from "@/lib/config";
 import { coordsLabel } from "@/lib/geo";
+import { latParam, lonParam, numParam } from "@/lib/params";
 import { rateLimited, tooMany } from "@/lib/ratelimit";
 import { airfieldMarkers, fetchNearby } from "@/lib/sources/adsbfi";
 import { recordAircraft } from "@/lib/store";
@@ -22,24 +23,15 @@ export async function GET(req: Request) {
   // every call can reach the upstream feed and write to the database
   if (rateLimited(req, "aircraft", 40, 60_000)) return tooMany(30);
   const p = new URL(req.url).searchParams;
-  const nmParam = Number(p.get("nm"));
-  const nm = Math.min(
-    250,
-    Math.max(10, Number.isFinite(nmParam) && nmParam > 0 ? nmParam : RADIUS_NM),
-  );
+  const nmRaw = numParam(p, "nm");
+  const nm = Math.min(250, Math.max(10, nmRaw && nmRaw > 0 ? nmRaw : RADIUS_NM));
 
   // optional home override from client settings (browser location / map pick)
-  const latN = Number(p.get("lat"));
-  const lonN = Number(p.get("lon"));
-  const custom =
-    p.get("lat") !== null &&
-    p.get("lon") !== null &&
-    Number.isFinite(latN) &&
-    Number.isFinite(lonN) &&
-    Math.abs(latN) <= 90 &&
-    Math.abs(lonN) <= 180;
+  const customLat = latParam(p);
+  const customLon = lonParam(p);
+  const custom = customLat !== undefined && customLon !== undefined;
   const home = custom
-    ? { lat: latN, lon: lonN }
+    ? { lat: customLat, lon: customLon }
     : { lat: HOME.lat, lon: HOME.lon };
   const name = (
     p.get("name")?.trim().slice(0, 24) ||

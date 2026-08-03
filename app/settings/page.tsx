@@ -6,6 +6,7 @@ import MapPicker from "@/components/MapPicker";
 import Radar from "@/components/Radar";
 import { DEFAULT_SETTINGS, useSettings, type Settings } from "@/lib/settings";
 import { useGeoOutline } from "@/lib/useGeoOutline";
+import type { AirfieldMarker, Enrichment, RadarPayload } from "@/lib/types";
 
 const BTN =
   "border border-line px-4 py-2 font-mono text-[11px] uppercase tracking-[0.25em] text-faint transition-colors hover:border-accent/40 hover:text-accent";
@@ -203,6 +204,52 @@ export default function SettingsPage() {
     settings.homeLon,
     settings.radarNm,
   );
+
+  // The radar preview shows the real thing rather than an empty ring, so the
+  // airfield and route-track switches have something to act on. Fetched once
+  // when the tab opens, and again if the home point or range changes.
+  const [radar, setRadar] = useState<RadarPayload | null>(null);
+  const [track, setTrack] = useState<AirfieldMarker[] | null>(null);
+
+  useEffect(() => {
+    if (tab !== "radar") return;
+    let live = true;
+    const q = new URLSearchParams({ nm: String(settings.radarNm) });
+    if (settings.homeLat != null && settings.homeLon != null) {
+      q.set("lat", String(settings.homeLat));
+      q.set("lon", String(settings.homeLon));
+    }
+    (async () => {
+      try {
+        const data = (await fetch(`/api/aircraft?${q}`).then((r) =>
+          r.json(),
+        )) as RadarPayload;
+        if (!live) return;
+        setRadar(data);
+
+        // the nearest aircraft with a callsign is the one likely to have a route
+        const lead = data.aircraft.find((a) => a.callsign);
+        if (!lead) {
+          setTrack(null);
+          return;
+        }
+        const eq = new URLSearchParams(q);
+        eq.set("hex", lead.hex);
+        eq.set("brg", lead.bearingDeg.toFixed(3));
+        eq.set("dist", lead.distanceKm.toFixed(3));
+        if (lead.callsign) eq.set("callsign", lead.callsign);
+        const e = (await fetch(`/api/enrich?${eq}`).then((r) =>
+          r.json(),
+        )) as Enrichment;
+        if (live) setTrack(e.routeTrack ?? null);
+      } catch {
+        // a preview is decorative; leave whatever is already drawn
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [tab, settings.radarNm, settings.homeLat, settings.homeLon]);
 
   const useBrowserLocation = () => {
     if (!navigator.geolocation) {
@@ -449,10 +496,15 @@ export default function SettingsPage() {
                 Preview · {Math.round(settings.radarNm * 1.852)} km
               </div>
               <Radar
-                aircraft={[]}
-                airfields={[]}
+                aircraft={radar?.aircraft ?? []}
+                airfields={settings.showAirfields ? (radar?.airfields ?? []) : []}
                 radiusKm={settings.radarNm * 1.852}
-                selectedHex={null}
+                selectedHex={
+                  settings.showRouteTrack
+                    ? (radar?.aircraft.find((a) => a.callsign)?.hex ?? null)
+                    : null
+                }
+                routeTrack={settings.showRouteTrack ? track : null}
                 geo={previewGeo}
               />
             </div>

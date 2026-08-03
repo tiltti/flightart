@@ -6,6 +6,11 @@ import { useEffect, useState } from "react";
 // radar units by the server. When no home point is configured in the browser
 // the coordinates are left out of the request and the server uses its own, so
 // no location is ever baked into the client.
+// The outline is cached hard by the browser, so any change to how it is
+// generated needs a new key — otherwise a client that cached a bad response
+// keeps it for a day. Bump this whenever the geometry changes.
+const GEOMETRY_VERSION = 2;
+
 export function useGeoOutline(
   enabled: boolean,
   lat: number | null,
@@ -20,7 +25,7 @@ export function useGeoOutline(
       return;
     }
     let live = true;
-    const q = new URLSearchParams({ nm: String(nm) });
+    const q = new URLSearchParams({ nm: String(nm), v: String(GEOMETRY_VERSION) });
     if (lat != null && lon != null) {
       q.set("lat", String(lat));
       q.set("lon", String(lon));

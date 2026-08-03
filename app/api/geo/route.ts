@@ -1,5 +1,6 @@
 import { HOME, RADIUS_NM } from "@/lib/config";
 import { outlinePaths } from "@/lib/geooutline";
+import { latParam, lonParam, numParam } from "@/lib/params";
 import { rateLimited, tooMany } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
@@ -7,13 +8,11 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   if (rateLimited(req, "geo", 30, 60_000)) return tooMany(60);
   const p = new URL(req.url).searchParams;
-  const latN = Number(p.get("lat"));
-  const lonN = Number(p.get("lon"));
-  const nmN = Number(p.get("nm"));
 
-  const lat = Number.isFinite(latN) && Math.abs(latN) <= 90 ? latN : HOME.lat;
-  const lon = Number.isFinite(lonN) && Math.abs(lonN) <= 180 ? lonN : HOME.lon;
-  const nm = Math.min(250, Math.max(10, Number.isFinite(nmN) && nmN > 0 ? nmN : RADIUS_NM));
+  const lat = latParam(p) ?? HOME.lat;
+  const lon = lonParam(p) ?? HOME.lon;
+  const nmRaw = numParam(p, "nm");
+  const nm = Math.min(250, Math.max(10, nmRaw && nmRaw > 0 ? nmRaw : RADIUS_NM));
 
   return Response.json(
     { paths: outlinePaths(lat, lon, nm * 1.852) },
