@@ -301,7 +301,7 @@ export default function SettingsPage() {
             <div>
             <Row
               label="Spotlight view"
-              hint="photo = always the photograph · auto/poster = poster art when a clean cutout exists"
+              hint="photo = always the photograph · auto/poster = poster art when a cutout has been generated and not banned, otherwise the photograph"
             >
               <Segmented
                 value={settings.displayMode}
