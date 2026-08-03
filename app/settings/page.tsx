@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import MapPicker from "@/components/MapPicker";
 import Radar from "@/components/Radar";
 import { DEFAULT_SETTINGS, useSettings, type Settings } from "@/lib/settings";
@@ -102,10 +102,97 @@ function Segmented<T extends string>({
   );
 }
 
+interface Sample {
+  registration: string | null;
+  hex: string;
+  typeCode: string | null;
+  operator: string | null;
+  photoUrl: string | null;
+  cutoutUrl: string | null;
+  photographer: string | null;
+}
+
+// A real airframe from the logbook, shown the way the wall would show it.
+function SpotlightPreview({
+  mode,
+  sample,
+}: {
+  mode: Settings["displayMode"];
+  sample: Sample | null;
+}) {
+  if (!sample) {
+    return (
+      <div className="flex aspect-[3/4] items-center justify-center border border-line bg-panel font-mono text-[10px] uppercase tracking-[0.3em] text-faint">
+        loading…
+      </div>
+    );
+  }
+  const poster = mode !== "photo" && Boolean(sample.cutoutUrl);
+  const field = "#22405c";
+
+  return (
+    <div>
+      <div
+        className="fa-grain relative flex aspect-[3/4] flex-col overflow-hidden border border-line"
+        style={{ background: poster ? field : "#05080c" }}
+      >
+        <div className="flex flex-1 items-center justify-center p-4">
+          {poster ? (
+            // eslint-disable-next-line @next/next/no-img-element -- preview
+            <img
+              src={sample.cutoutUrl!}
+              alt=""
+              className="max-h-full max-w-[88%] object-contain"
+              style={{ filter: "drop-shadow(0 12px 16px rgba(0,0,0,0.35))" }}
+            />
+          ) : sample.photoUrl ? (
+            <figure className="w-[86%] border border-line bg-panel/80 p-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.6)]">
+              {/* eslint-disable-next-line @next/next/no-img-element -- preview */}
+              <img src={sample.photoUrl} alt="" className="block w-full" />
+              {sample.photographer && (
+                <figcaption className="truncate pt-1 font-mono text-[6px] uppercase tracking-[0.2em] text-faint">
+                  Photo by {sample.photographer}
+                </figcaption>
+              )}
+            </figure>
+          ) : null}
+        </div>
+        <div className="px-4 pb-4">
+          <div className="font-mono text-[7px] uppercase tracking-[0.4em] text-faint">
+            aircraft
+          </div>
+          <div className="font-display text-lg font-light uppercase tracking-[0.1em] text-ink">
+            {sample.registration ?? sample.hex.toUpperCase()}
+          </div>
+          <div className="mt-1 font-mono text-[7px] uppercase tracking-[0.3em] text-dim">
+            {[sample.typeCode, sample.operator].filter(Boolean).join(" · ")}
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 font-mono text-[10px] uppercase tracking-[0.25em] text-faint">
+        {mode === "photo"
+          ? "always the photograph"
+          : poster
+            ? "poster art · this airframe has a cutout"
+            : "no cutout for this airframe → photo"}
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [settings, update] = useSettings();
   const [tab, setTab] = useState<Tab>("location");
   const [geoStatus, setGeoStatus] = useState<string | null>(null);
+  const [sample, setSample] = useState<Sample | null>(null);
+
+  useEffect(() => {
+    if (tab !== "display" || sample) return;
+    fetch("/api/sightings?cutouts=1&filter=kept&per=6")
+      .then((r) => r.json())
+      .then((d: { rows?: Sample[] }) => setSample(d.rows?.[0] ?? null))
+      .catch(() => {});
+  }, [tab, sample]);
 
   const lat = settings.homeLat ?? 60.25;
   const lon = settings.homeLon ?? 24.065;
@@ -210,7 +297,8 @@ export default function SettingsPage() {
         )}
 
         {tab === "display" && (
-          <section>
+          <section className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_260px]">
+            <div>
             <Row
               label="Spotlight view"
               hint="photo = always the photograph · auto/poster = poster art when a clean cutout exists"
@@ -243,6 +331,14 @@ export default function SettingsPage() {
                 onChange={(spotlightSec) => update({ spotlightSec })}
               />
             </Row>
+            </div>
+
+            <div>
+              <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.3em] text-faint">
+                Preview · {settings.displayMode}
+              </div>
+              <SpotlightPreview mode={settings.displayMode} sample={sample} />
+            </div>
           </section>
         )}
 

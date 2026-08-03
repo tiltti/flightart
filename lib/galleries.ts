@@ -10,6 +10,21 @@ export interface PhotoCandidate {
   source: string;
   photographer: string;
   link: string;
+  title?: string;
+}
+
+// Commons is a free-text search, not a registration lookup: searching for
+// "D-CSUN" happily returns other Citations whose pages never mention it. Only
+// a file that names the registration is safe to attach automatically.
+export function namesRegistration(
+  candidate: PhotoCandidate,
+  registration: string | null,
+): boolean {
+  if (candidate.source !== "commons") return true; // keyed by hex or reg already
+  const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const reg = norm(registration ?? "");
+  if (reg.length < 4) return false; // too short to match without false hits
+  return norm(candidate.title ?? candidate.id).includes(reg);
 }
 
 async function getJson(url: string): Promise<unknown | null> {
@@ -75,23 +90,24 @@ export async function commons(reg: string): Promise<PhotoCandidate[]> {
   const body = (await getJson(`https://commons.wikimedia.org/w/api.php?${q}`)) as {
     query?: { pages?: Record<string, CommonsPage> };
   } | null;
-  return Object.values(body?.query?.pages ?? {})
-    .map((p) => {
-      const ii = p.imageinfo?.[0];
-      if (!ii?.thumburl || !/^image\/(jpeg|png)/.test(ii.mime ?? "")) return null;
-      const artist = (ii.extmetadata?.Artist?.value ?? "")
-        .replace(/<[^>]*>/g, "")
-        .trim();
-      return {
-        id: `wc-${p.title}`,
-        thumb: ii.thumburl,
-        full: ii.thumburl,
-        source: "commons",
-        photographer: artist || "Wikimedia Commons",
-        link: ii.descriptionurl ?? "https://commons.wikimedia.org",
-      };
-    })
-    .filter((c): c is PhotoCandidate => c !== null);
+  const out: PhotoCandidate[] = [];
+  for (const p of Object.values(body?.query?.pages ?? {})) {
+    const ii = p.imageinfo?.[0];
+    if (!ii?.thumburl || !/^image\/(jpeg|png)/.test(ii.mime ?? "")) continue;
+    const artist = (ii.extmetadata?.Artist?.value ?? "")
+      .replace(/<[^>]*>/g, "")
+      .trim();
+    out.push({
+      id: `wc-${p.title}`,
+      thumb: ii.thumburl,
+      full: ii.thumburl,
+      source: "commons",
+      photographer: artist || "Wikimedia Commons",
+      link: ii.descriptionurl ?? "https://commons.wikimedia.org",
+      title: p.title ?? "",
+    });
+  }
+  return out;
 }
 
 export async function findCandidates(

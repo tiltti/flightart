@@ -414,9 +414,14 @@ export async function collectStackPhotos(
   stackJobs.add(hex);
   try {
     if (await stackCollected(hex)) return;
-    const { findCandidates } = await import("@/lib/galleries");
+    const { findCandidates, namesRegistration } = await import("@/lib/galleries");
     const candidates = (await findCandidates(hex, registration)).filter(
-      (c) => c.photographer && c.link !== primaryPageLink,
+      (c) =>
+        c.photographer &&
+        c.link !== primaryPageLink &&
+        // a loose text match can be a different airframe entirely, and nothing
+        // attached automatically may claim to be an aircraft it is not
+        namesRegistration(c, registration),
     );
 
     let slot = 1;
