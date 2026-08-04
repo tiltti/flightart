@@ -6,7 +6,8 @@ import {
   getMedia,
   getStackPhotos,
   markPhotoOnly,
-  resetCutout,
+  regenerateCutout,
+  restoreCutout,
   setPhotoFromBytes,
   setPhotoFromUrl,
 } from "@/lib/media";
@@ -118,12 +119,20 @@ export async function POST(
           cutoutUrl: media.cutoutUrl,
         });
       }
-      if (body.mode === "auto") {
-        const media = await resetCutout(hex);
+      if (body.mode === "auto" || body.mode === "regenerate") {
+        const { media, refused } =
+          body.mode === "regenerate"
+            ? await regenerateCutout(hex)
+            : await restoreCutout(hex);
         return Response.json({
           ok: true,
           cutout: media.cutoutState,
           cutoutUrl: media.cutoutUrl,
+          ...(refused
+            ? {
+                note: "kept the existing cutout — background removal is not available here, so it could not be replaced",
+              }
+            : {}),
         });
       }
 

@@ -73,6 +73,7 @@ export default function AircraftPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [url, setUrl] = useState("");
   const [v, setV] = useState(0); // cache-buster for photo/cutout imgs
+  const [note, setNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -139,14 +140,16 @@ export default function AircraftPage() {
     }
   };
 
-  const setMode = async (mode: "auto" | "photo-only") => {
-    setBusy(mode === "auto" ? "re-attempting cutout…" : "pinning photo only…");
+  const setMode = async (mode: "regenerate" | "photo-only") => {
+    setBusy(mode === "regenerate" ? "re-attempting cutout…" : "pinning photo only…");
     try {
-      await fetch(`/api/plane/${hex}`, {
+      const res = await fetch(`/api/plane/${hex}`, {
         method: "POST",
         headers: adminHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ mode }),
       });
+      const out = (await res.json().catch(() => null)) as { note?: string } | null;
+      if (out?.note) setNote(out.note);
       await refreshed();
     } finally {
       setBusy(null);
@@ -250,7 +253,7 @@ export default function AircraftPage() {
                 Find photos
               </button>
               <button
-                onClick={() => setMode("auto")}
+                onClick={() => setMode("regenerate")}
                 disabled={!!busy || !detail.photoUrl}
                 className={BTN}
               >
@@ -297,6 +300,11 @@ export default function AircraftPage() {
             {busy && (
               <div className="mt-4 font-mono text-[10px] uppercase tracking-[0.3em] text-accent">
                 {busy}
+              </div>
+            )}
+            {note && !busy && (
+              <div className="mt-4 max-w-xl font-mono text-[10px] leading-relaxed tracking-[0.15em] text-faint">
+                {note}
               </div>
             )}
 

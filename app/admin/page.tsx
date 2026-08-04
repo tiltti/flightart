@@ -42,6 +42,9 @@ function Tile({
             src={entry.cutoutUrl}
             alt=""
             className="max-h-full max-w-[92%] object-contain"
+            // a banned cutout is kept on file, so it is shown dimmed rather
+            // than hidden — you can see what the decision applied to
+            style={banned ? { filter: "grayscale(1) brightness(0.5)" } : undefined}
           />
         ) : entry.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- gallery photo
@@ -108,6 +111,7 @@ export default function AdminPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [secret, setSecret] = useState("");
   const [needsSecret, setNeedsSecret] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
 
   useEffect(() => {
     setSecret(getAdminSecret());
@@ -141,6 +145,8 @@ export default function AdminPage() {
         return;
       }
       setNeedsSecret(false);
+      const out = (await res.json().catch(() => null)) as { note?: string } | null;
+      setNote(out?.note ?? null);
       await load();
     } finally {
       setBusy(null);
@@ -228,6 +234,12 @@ export default function AdminPage() {
             {data ? `${data.total} airframes · most seen first` : "…"}
           </span>
         </div>
+
+        {note && (
+          <div className="mb-6 border border-line px-4 py-3 font-mono text-[10px] leading-relaxed tracking-[0.15em] text-faint">
+            {note}
+          </div>
+        )}
 
         {!data ? (
           <div className="font-mono text-xs uppercase tracking-[0.3em] text-faint">

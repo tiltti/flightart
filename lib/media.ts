@@ -463,21 +463,54 @@ export async function collectStackPhotos(
   }
 }
 
+// Banning hides a cutout rather than destroying it. The image costs a few tens
+// of kilobytes and keeping it makes the decision reversible from anywhere,
+// including a deployment that cannot run background removal.
 export async function markPhotoOnly(hex: string): Promise<AirframeMedia> {
-  const media = await getMedia(hex);
-  if (media?.cutoutKey) await deleteBlob(media.cutoutKey);
   return upsert(hex, {
-    cutout_url: null,
-    cutout_key: null,
     cutout_state: "rejected",
     rejected_reason: "manual",
   });
 }
 
-export async function resetCutout(hex: string): Promise<AirframeMedia> {
+export interface CutoutAction {
+  media: AirframeMedia;
+  // set when a request to remake a cutout was refused to avoid losing the
+  // existing one in an environment that cannot produce a replacement
+  refused?: boolean;
+}
+
+// Lifting a ban. Never destructive: a cutout that is still on file comes back
+// immediately, and one that is missing is queued for whichever environment can
+// generate it.
+export async function restoreCutout(hex: string): Promise<CutoutAction> {
   const media = await getMedia(hex);
-  if (media?.cutoutKey) await deleteBlob(media.cutoutKey);
   jobs.delete(hex);
+
+  if (media?.cutoutKey && media.cutoutUrl) {
+    return {
+      media: await upsert(hex, { cutout_state: "ok", rejected_reason: null }),
+    };
+  }
+  await upsert(hex, {
+    cutout_url: null,
+    cutout_key: null,
+    cutout_state: "none",
+    rejected_reason: null,
+    cutout_attempts: "0",
+  });
+  return { media: await ensureCutout(hex) };
+}
+
+// Deliberately discarding a cutout to make a new one. This is the only path
+// that throws an image away, so it refuses where nothing could replace it.
+export async function regenerateCutout(hex: string): Promise<CutoutAction> {
+  const media = await getMedia(hex);
+  if (media?.cutoutState === "ok" && !cutoutsEnabled) {
+    return { media, refused: true };
+  }
+  jobs.delete(hex);
+  if (media?.cutoutKey) await deleteBlob(media.cutoutKey);
   await upsert(hex, {
     cutout_url: null,
     cutout_key: null,
@@ -485,5 +518,5 @@ export async function resetCutout(hex: string): Promise<AirframeMedia> {
     rejected_reason: null,
     cutout_attempts: "0", // an explicit retry starts the budget over
   });
-  return ensureCutout(hex);
+  return { media: await ensureCutout(hex) };
 }
