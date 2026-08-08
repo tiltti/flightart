@@ -18,6 +18,8 @@ interface Props {
   airfields: AirfieldMarker[];
   radiusKm: number;
   selectedHex: string | null;
+  // draws a targeting reticle while the narrow layout hands over to the art
+  acquiringHex?: string | null;
   queuedHexes?: string[];
   geo?: number[][][] | null;
   routeTrack?: AirfieldMarker[] | null;
@@ -29,6 +31,7 @@ export default function Radar({
   airfields,
   radiusKm,
   selectedHex,
+  acquiringHex,
   queuedHexes,
   geo,
   routeTrack,
@@ -269,6 +272,31 @@ export default function Radar({
                   strokeWidth="0.5"
                   style={{ transformBox: "fill-box", transformOrigin: "center" }}
                 />
+              )}
+              {a.hex === acquiringHex && (
+                <g className="stroke-accent" fill="none">
+                  <circle
+                    r="7"
+                    strokeWidth="0.5"
+                    strokeDasharray="3 2"
+                    className="animate-[fa-rotate_3s_linear_infinite]"
+                    style={{ transformBox: "fill-box", transformOrigin: "center" }}
+                  />
+                  <circle
+                    r="9"
+                    strokeWidth="0.6"
+                    className="animate-[fa-lock_1.2s_ease-out_infinite]"
+                    style={{ transformBox: "fill-box", transformOrigin: "center" }}
+                  />
+                  {[
+                    [-11, 0, -7, 0],
+                    [7, 0, 11, 0],
+                    [0, -11, 0, -7],
+                    [0, 7, 0, 11],
+                  ].map(([x1, y1, x2, y2], i) => (
+                    <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} strokeWidth="0.6" />
+                  ))}
+                </g>
               )}
               <g transform={`rotate(${a.track ?? 0})`}>
                 <path

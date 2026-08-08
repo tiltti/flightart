@@ -56,7 +56,7 @@ function Th({
 function Tile({ label, value }: { label: string; value: string | number }) {
   return (
     <div>
-      <div className="font-display text-6xl font-light tracking-wide text-ink">
+      <div className="font-display text-4xl font-light tracking-wide text-ink md:text-6xl">
         {value}
       </div>
       <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.35em] text-faint">
@@ -228,7 +228,7 @@ export default function HistoryPage() {
   const portraits = recent.filter((s) => s.photoUrl).slice(0, 3);
 
   return (
-    <main className="min-h-dvh bg-bg px-10 py-8 text-ink lg:px-16">
+    <main className="min-h-dvh bg-bg px-5 py-6 text-ink md:px-10 md:py-8 lg:px-16">
       <header className="mb-14 flex items-baseline justify-between font-mono text-[11px] uppercase tracking-[0.4em] text-dim">
         <span>flightart · log</span>
         <Link href="/" className="text-faint transition-colors hover:text-accent">
@@ -298,7 +298,7 @@ export default function HistoryPage() {
                   setQ(e.target.value);
                   setPage(1);
                 }}
-                className={`${INPUT} w-80`}
+                className={`${INPUT} w-full sm:w-80`}
               />
               <input
                 type="date"
@@ -326,7 +326,8 @@ export default function HistoryPage() {
               </span>
             </div>
 
-            <table className="w-full border-collapse font-mono text-xs">
+            <div className="-mx-2 overflow-x-auto px-2">
+            <table className="w-full min-w-[640px] border-collapse font-mono text-xs">
               <thead>
                 <tr className="text-left">
                   <Th id="time" label="Time" sort={sort} dir={dir} onSort={onSort} />
@@ -397,6 +398,7 @@ export default function HistoryPage() {
                 )}
               </tbody>
             </table>
+            </div>
 
             {log && log.total > log.per && (
               <div className="mt-5 flex items-center justify-between font-mono text-[11px] uppercase tracking-[0.25em] text-faint">

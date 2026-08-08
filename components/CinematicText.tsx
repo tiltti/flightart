@@ -50,7 +50,7 @@ export default function CinematicText({
   }, [totalMs]);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3 md:gap-4">
       {lines.map((line, i) => {
         const startAt = start + i * stagger;
         const shown = Math.max(0, Math.floor((t - startAt) / charMs));
@@ -69,8 +69,8 @@ export default function CinematicText({
             <div
               className={`font-display font-light uppercase text-ink ${
                 xl
-                  ? "mt-2 text-5xl tracking-[0.1em]"
-                  : "mt-1 text-2xl tracking-[0.14em]"
+                  ? "mt-2 text-3xl tracking-[0.08em] md:text-5xl md:tracking-[0.1em]"
+                  : "mt-1 text-lg tracking-[0.1em] md:text-2xl md:tracking-[0.14em]"
               }`}
             >
               {text}

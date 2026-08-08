@@ -47,7 +47,7 @@ interface Candidate {
 function Tile({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="font-display text-4xl font-light tracking-wide text-ink">
+      <div className="font-display text-3xl font-light tracking-wide text-ink md:text-4xl">
         {value}
       </div>
       <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.35em] text-faint">
@@ -159,7 +159,7 @@ export default function AircraftPage() {
   const title = (detail?.registration ?? String(hex)).toUpperCase();
 
   return (
-    <main className="min-h-dvh bg-bg px-10 py-8 text-ink lg:px-16">
+    <main className="min-h-dvh bg-bg px-5 py-6 text-ink md:px-10 md:py-8 lg:px-16">
       <header className="mb-12 flex items-baseline justify-between font-mono text-[11px] uppercase tracking-[0.4em] text-dim">
         <span>flightart · aircraft</span>
         <Link
@@ -177,7 +177,7 @@ export default function AircraftPage() {
       ) : (
         <div className="mx-auto flex max-w-5xl flex-col gap-14">
           <section>
-            <h1 className="font-display text-6xl font-light uppercase tracking-[0.08em]">
+            <h1 className="font-display text-3xl md:text-6xl font-light uppercase tracking-[0.08em]">
               {title}
             </h1>
             <div className="mt-3 font-mono text-xs uppercase tracking-[0.3em] text-dim">
@@ -349,7 +349,7 @@ export default function AircraftPage() {
             <h2 className="mb-5 font-mono text-[10px] uppercase tracking-[0.35em] text-faint">
               Sighting history
             </h2>
-            <table className="w-full border-collapse font-mono text-xs">
+            <table className="w-full min-w-[560px] border-collapse font-mono text-xs">
               <thead>
                 <tr className="text-left uppercase tracking-[0.2em] text-faint">
                   <th className="border-b border-line pb-2 pr-4 font-normal">Time</th>

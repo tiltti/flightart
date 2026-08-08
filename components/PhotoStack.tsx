@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useIsNarrow } from "@/lib/useIsNarrow";
 import type { PhotoInfo } from "@/lib/types";
 
 // Photographs of the airframe laid out like a hand of cards: one square in the
@@ -74,6 +75,7 @@ export default function PhotoStack({ photos }: { photos: PhotoInfo[] }) {
   const deck = photos.slice(0, SEATS.length);
   const [opened, setOpened] = useState(false);
   const [turn, setTurn] = useState(0);
+  const narrow = useIsNarrow();
 
   useEffect(() => {
     setOpened(false);
@@ -90,12 +92,34 @@ export default function PhotoStack({ photos }: { photos: PhotoInfo[] }) {
 
   if (deck.length === 0) return null;
 
+  // A fan needs width the phone does not have, so there the photographs take
+  // the same turns one at a time, each at full size.
+  if (narrow && deck.length > 1) {
+    const current = deck[turn % deck.length];
+    return (
+      <div className="grid w-[88vw]">
+        <div key={current.url} className="animate-[fa-fade_0.7s_ease_both]">
+          <Card photo={current} seat={SEATS[0]} opened />
+        </div>
+        <div className="mt-3 flex justify-center gap-2">
+          {deck.map((p, i) => (
+            <span
+              key={p.url}
+              className={`h-px w-6 transition-colors duration-500 ${
+                i === turn % deck.length ? "bg-accent" : "bg-line"
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   // a lone photo keeps the plain framed look
   if (deck.length === 1) {
     return (
       <div
-        className="grid animate-[fa-rise_1.6s_ease_both]"
-        style={{ width: "min(46vw, 640px)" }}
+        className="grid w-[86vw] animate-[fa-rise_1.6s_ease_both] md:w-[min(46vw,640px)]"
       >
         <Card photo={deck[0]} seat={SEATS[0]} opened />
       </div>
@@ -106,8 +130,8 @@ export default function PhotoStack({ photos }: { photos: PhotoInfo[] }) {
     <div
       // the grid stacks every card in one cell; the padding leaves room for the
       // fan so nothing is clipped by the edge of the spotlight
-      className="grid animate-[fa-rise_1.6s_ease_both]"
-      style={{ width: "min(56vw, 780px)", padding: "1% 17% 9% 17%" }}
+      className="grid w-[92vw] animate-[fa-rise_1.6s_ease_both] md:w-[min(56vw,780px)]"
+      style={{ padding: "1% 17% 9% 17%" }}
     >
       {deck.map((p, i) => (
         <Card

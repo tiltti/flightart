@@ -156,7 +156,7 @@ export default function AdminPage() {
   const pageCount = data ? Math.max(1, Math.ceil(data.total / data.per)) : 1;
 
   return (
-    <main className="min-h-dvh bg-bg px-10 py-8 text-ink lg:px-16">
+    <main className="min-h-dvh bg-bg px-5 py-6 text-ink md:px-10 md:py-8 lg:px-16">
       <header className="mb-10 flex items-baseline justify-between font-mono text-[11px] uppercase tracking-[0.4em] text-dim">
         <span>flightart · admin</span>
         <Link href="/" className="text-faint transition-colors hover:text-accent">

@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import DecoFrame from "@/components/DecoFrame";
+import NavMenu from "@/components/NavMenu";
 import Radar from "@/components/Radar";
 import Spotlight from "@/components/Spotlight";
 import { useSettings } from "@/lib/settings";
 import { useGeoOutline } from "@/lib/useGeoOutline";
+import { useIsNarrow } from "@/lib/useIsNarrow";
 import type {
   Aircraft,
   Enrichment,
@@ -18,22 +20,12 @@ import type {
 
 const GONE_GRACE_MS = 15_000; // keep spotlight through a brief signal dropout
 
-function Clock() {
-  const [now, setNow] = useState("");
-  useEffect(() => {
-    const update = () =>
-      setNow(
-        new Date().toLocaleTimeString("fi-FI", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      );
-    update();
-    const id = setInterval(update, 10_000);
-    return () => clearInterval(id);
-  }, []);
-  return <span>{now}</span>;
-}
+// A phone has room for one pane at a time, so the display alternates: watch the
+// radar, see the target lock on, look at the aircraft, come back.
+const MOBILE_RADAR_MS = 8000;
+const MOBILE_ACQUIRE_MS = 2600;
+const MOBILE_SPOTLIGHT_MS = 22_000;
+type Phase = "radar" | "acquiring" | "spotlight";
 
 function Idle({ stats, error }: { stats: Stats | null; error?: string }) {
   return (
@@ -72,6 +64,49 @@ export default function Home() {
   // read inside callbacks without making them depend on every settings change
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+
+  const narrow = useIsNarrow();
+  const [phase, setPhase] = useState<Phase>("radar");
+  const [locking, setLocking] = useState(false);
+
+  // the radar locks onto whichever aircraft has just taken the spotlight —
+  // on the wall that is the whole cue, on a phone it precedes the handover
+  useEffect(() => {
+    if (!selected) return;
+    setLocking(true);
+    const t = setTimeout(() => setLocking(false), MOBILE_ACQUIRE_MS);
+    return () => clearTimeout(t);
+  }, [selected?.hex]);
+
+  // the cycle restarts whenever a different aircraft takes the spotlight
+  useEffect(() => {
+    if (!narrow || !selected) {
+      setPhase("radar");
+      return;
+    }
+    setPhase("radar");
+    const toAcquire = setTimeout(() => setPhase("acquiring"), MOBILE_RADAR_MS);
+    const toSpotlight = setTimeout(
+      () => setPhase("spotlight"),
+      MOBILE_RADAR_MS + MOBILE_ACQUIRE_MS,
+    );
+    const back = setInterval(
+      () => {
+        setPhase("radar");
+        setTimeout(() => setPhase("acquiring"), MOBILE_RADAR_MS);
+        setTimeout(
+          () => setPhase("spotlight"),
+          MOBILE_RADAR_MS + MOBILE_ACQUIRE_MS,
+        );
+      },
+      MOBILE_RADAR_MS + MOBILE_ACQUIRE_MS + MOBILE_SPOTLIGHT_MS,
+    );
+    return () => {
+      clearTimeout(toAcquire);
+      clearTimeout(toSpotlight);
+      clearInterval(back);
+    };
+  }, [narrow, selected?.hex]);
 
   const featuredAt = useRef(new Map<string, number>());
   const selectedHexRef = useRef<string | null>(null);
@@ -245,22 +280,66 @@ export default function Home() {
     return () => clearInterval(id);
   }, [settings.rotatePages, settings.rotateIntervalMin, router]);
 
+  const spotlightPane = selected ? (
+    <Spotlight
+      aircraft={selected}
+      enrichment={enrichment}
+      settings={settings}
+      footer={data ? `${data.homeCoords} · ${data.home}` : ""}
+    />
+  ) : (
+    <Idle stats={idleStats} error={data?.error} />
+  );
+
+  // On a phone both panes are full-screen layers that cross-fade; on the wall
+  // they sit side by side and are always both visible.
+  const showSpotlight = !narrow || phase === "spotlight";
+  const showRadar = !narrow || phase !== "spotlight";
+
   return (
-    <main className="relative flex h-dvh w-full overflow-hidden bg-bg text-ink">
-      <section className="relative min-w-0 flex-[1.25]">
-        {selected ? (
-          <Spotlight
-            aircraft={selected}
-            enrichment={enrichment}
-            settings={settings}
-            footer={data ? `${data.homeCoords} · ${data.home}` : ""}
-          />
-        ) : (
-          <Idle stats={idleStats} error={data?.error} />
-        )}
+    <main
+      className={`relative h-dvh w-full overflow-hidden bg-bg text-ink ${
+        narrow ? "" : "flex"
+      }`}
+    >
+      <section
+        className={
+          narrow
+            ? "absolute inset-0 transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+            : "relative min-w-0 flex-[1.25]"
+        }
+        style={
+          narrow
+            ? {
+                opacity: showSpotlight ? 1 : 0,
+                transform: showSpotlight ? "scale(1)" : "scale(0.94)",
+                pointerEvents: showSpotlight ? "auto" : "none",
+                zIndex: showSpotlight ? 2 : 1,
+              }
+            : undefined
+        }
+      >
+        {spotlightPane}
       </section>
 
-      <aside className="relative flex flex-1 items-center justify-center p-10">
+      <aside
+        className={
+          narrow
+            ? "absolute inset-0 flex items-center justify-center p-4 transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+            : "relative flex flex-1 items-center justify-center p-10"
+        }
+        style={
+          narrow
+            ? {
+                opacity: showRadar ? 1 : 0,
+                // pushes past the viewer as the art takes over
+                transform: showRadar ? "scale(1)" : "scale(1.14)",
+                pointerEvents: showRadar ? "auto" : "none",
+                zIndex: showRadar ? 2 : 1,
+              }
+            : undefined
+        }
+      >
         <Radar
           key={`${settings.homeLat}:${settings.homeLon}:${settings.radarNm}`}
           aircraft={data?.aircraft ?? []}
@@ -268,6 +347,11 @@ export default function Home() {
           routeTrack={settings.showRouteTrack ? enrichment?.routeTrack : null}
           radiusKm={data?.radiusKm ?? settings.radarNm * 1.852}
           selectedHex={selected?.hex ?? null}
+          acquiringHex={
+            (narrow ? phase === "acquiring" : locking)
+              ? (selected?.hex ?? null)
+              : null
+          }
           queuedHexes={queue}
           geo={geo}
           onSelect={(hex) => {
@@ -286,11 +370,11 @@ export default function Home() {
         {/* all chrome lives on the radar side — the spotlight keeps its half clean */}
         <div className="pointer-events-none absolute inset-x-0 top-7 z-20 flex flex-col items-center gap-3">
           <div className="flex items-center gap-5">
-            <span className="h-px w-16 bg-line" />
+            <span className="hidden h-px w-16 bg-line sm:block" />
             <span className="font-deco text-[13px] tracking-[0.6em] text-dim">
               ✦ FLIGHTART ✦
             </span>
-            <span className="h-px w-16 bg-line" />
+            <span className="hidden h-px w-16 bg-line sm:block" />
           </div>
           <div className="font-mono text-[10px] uppercase tracking-[0.4em] text-faint">
             {data?.home ?? ""} ·{" "}
@@ -298,32 +382,15 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="absolute right-7 top-7 z-20 flex items-center gap-6 font-mono text-[11px] uppercase tracking-[0.4em] text-dim">
-          <Clock />
-          <Link
-            href="/history"
-            className="text-faint transition-colors hover:text-accent"
-          >
-            log
-          </Link>
-          <Link
-            href="/admin"
-            className="text-faint transition-colors hover:text-accent"
-          >
-            adm
-          </Link>
-          <Link
-            href="/settings"
-            className="text-faint transition-colors hover:text-accent"
-          >
-            set
-          </Link>
-        </div>
-
-        <div className="absolute bottom-6 right-7 z-20 font-mono text-[10px] uppercase tracking-[0.35em] text-faint">
+        <div className="absolute inset-x-0 bottom-6 z-20 text-center font-mono text-[10px] uppercase tracking-[0.35em] text-faint md:inset-x-auto md:right-7 md:text-right">
           {data ? `${data.aircraft.length} aircraft in range` : "connecting"}
         </div>
       </aside>
+
+      {/* above both panes: the menu must stay reachable while the art is up */}
+      <div className="absolute right-5 top-5 z-40 md:right-7 md:top-7">
+        <NavMenu />
+      </div>
 
       <DecoFrame />
     </main>

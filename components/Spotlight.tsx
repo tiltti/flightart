@@ -66,7 +66,7 @@ function LiveField({
       >
         {label}
       </div>
-      <div className="mt-1 font-display text-xl font-light uppercase tracking-[0.15em] text-dim">
+      <div className="mt-1 font-display text-base font-light uppercase tracking-[0.15em] text-dim md:text-xl">
         {value.slice(0, shown)}
         {typing && (
           <span className="text-accent animate-[fa-blink_0.8s_steps(1)_infinite]">
@@ -105,7 +105,7 @@ function LiveRow({
   }
   fields.push({ label: "distance", value: `${a.distanceKm.toFixed(1)} KM` });
   return (
-    <div className="mt-6 flex gap-14">
+    <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3 md:mt-6 md:gap-14">
       {fields.map((f, i) => (
         <LiveField
           key={f.label}
@@ -179,7 +179,7 @@ export default function Spotlight({
           style={{ background: field, ...POSTER_INK }}
         >
           <div className="pointer-events-none absolute inset-4 border border-line" />
-          <div className="absolute left-9 top-8 z-10 font-deco text-[13px] tracking-[0.55em] text-ink">
+          <div className="absolute left-6 top-6 z-10 font-deco text-[11px] tracking-[0.4em] text-ink md:left-9 md:top-8 md:text-[13px] md:tracking-[0.55em]">
             {new Date()
               .toLocaleDateString("en-GB", {
                 day: "2-digit",
@@ -188,7 +188,7 @@ export default function Spotlight({
               })
               .toUpperCase()}
           </div>
-          <div className="relative z-10 flex h-full flex-col px-12 pb-14 pt-16">
+          <div className="relative z-10 flex h-full flex-col px-6 pb-10 pt-12 md:px-12 md:pb-14 md:pt-16">
             <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element -- generated cutout */}
               <img
@@ -206,7 +206,7 @@ export default function Spotlight({
               <LiveRow a={aircraft} startMs={liveStart} charMs={charMs} />
             </div>
           </div>
-          <div className="absolute inset-x-9 bottom-4 z-10 flex justify-between font-mono text-[9px] uppercase tracking-[0.3em] text-faint">
+          <div className="absolute inset-x-6 bottom-3 z-10 flex flex-wrap justify-between gap-x-4 font-mono text-[8px] uppercase tracking-[0.25em] text-faint md:inset-x-9 md:bottom-4 md:text-[9px] md:tracking-[0.3em]">
             <span>{footer}</span>
             {photo?.photographer && <span>photo — {photo.photographer}</span>}
           </div>
@@ -241,12 +241,12 @@ export default function Spotlight({
         }}
       />
 
-      <div className="relative z-10 flex h-full flex-col px-10 pb-12 pt-10">
+      <div className="relative z-10 flex h-full flex-col px-6 pb-8 pt-8 md:px-10 md:pb-12 md:pt-10">
         <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden pt-10">
           {photo ? (
             <PhotoStack photos={photos} />
           ) : (
-            <span className="select-none font-display text-[13rem] font-light leading-none tracking-widest text-ink/[0.05]">
+            <span className="select-none font-display text-[6rem] md:text-[13rem] font-light leading-none tracking-widest text-ink/[0.05]">
               {(aircraft.typeCode ?? "✈").toUpperCase()}
             </span>
           )}
